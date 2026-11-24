@@ -1,0 +1,14 @@
+{
+  "name": "ouf-farmacy-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "إدارة صيدلية عوف - لوحة الإدارة والمراقبة",
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
+}

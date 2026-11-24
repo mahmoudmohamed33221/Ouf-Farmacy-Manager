@@ -1,0 +1,9 @@
+{
+  "appId": "com.muradpharmacy.manager",
+  "appName": "إدارة صيدلية عوف",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorHttp": { "enabled": false },
+    "SplashScreen": { "launchShowDuration": 300, "launchAutoHide": true, "backgroundColor": "#0B0F19", "showSpinner": false }
+  }
+}
