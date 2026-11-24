@@ -1,0 +1,87 @@
+name: Build Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['www/**', 'capacitor.config.json', 'package.json', '.github/workflows/build-apk.yml']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp build number
+        run: |
+          BUILD="$(date -u +%Y%m%d%H%M)-${GITHUB_SHA::7}"
+          sed -i "s/__BUILD__/$BUILD/g" www/config.js
+
+      # مفتاح توقيع ثابت: علشان كل نسخة جديدة تتثبت فوق القديمة من غير ما تمسحها
+      - name: Use fixed signing keystore
+        run: |
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies
+        run: |
+          npm install
+      - run: npx cap add android
+
+      - run: npx cap sync android
+
+      - name: Manifest (no auto-backup)
+        run: |
+          M="android/app/src/main/AndroidManifest.xml"
+          python3 - "$M" <<'PY'
+          import sys,re
+          p=sys.argv[1]; s=open(p,encoding='utf-8').read()
+          perms=[]
+          add="".join('\n    <uses-permission android:name="android.permission.%s" />'%x for x in perms if 'android.permission.%s"'%x not in s)
+          s=s.replace('<uses-permission android:name="android.permission.INTERNET" />','<uses-permission android:name="android.permission.INTERNET" />'+add,1)
+          s=s.replace('android:allowBackup="true"','android:allowBackup="false"')
+          open(p,'w',encoding='utf-8').write(s)
+          PY
+          cat "$M"
+
+      - name: Fixed signing config
+        run: |
+          cat >> android/app/build.gradle << 'EOF'
+
+          android {
+              signingConfigs {
+                  debug {
+                      storeFile file('../../debug.keystore')
+                      storePassword 'android'
+                      keyAlias 'androiddebugkey'
+                      keyPassword 'android'
+                  }
+              }
+              buildTypes {
+                  debug {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+          EOF
+
+      - name: Generate app icons (أيقونة اللوجو)
+        run: |
+          pip install pillow -q
+          python3 tools/make_android_icons.py android/app/src/main/res resources/icon-only.png
+
+      - run: chmod +x android/gradlew
+      - name: Build APK
+        run: cd android && ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ouf-manager-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
