@@ -5,7 +5,7 @@ self.APP_CONFIG = {
   APP_NAME: "إدارة صيدلية عوف",
 
   // رابط سكربت الإدارة (Apps Script Web App - ملف backend/manager.gs). اتركه فاضي لحد ما تنشره، وبعدين الصق الرابط هنا.
-  MANAGER_URL: "",
+  MANAGER_URL: "https://script.google.com/macros/s/AKfycbwMM7976ZTjonsdcgw2UQc8EQ2QYKSYi8hnlYI0cLK413fcy1sPRTXBS6blNyvbJqo/exec",
 
   POLL_MS: 10000,   // كل كام ملّي ثانية البرنامج يحدّث البيانات (والتطبيق ظاهر)
 
