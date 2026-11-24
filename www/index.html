@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0B0F19">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>إدارة صيدلية عوف</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<script>if (location.hostname === "localhost") document.write('<script src="capacitor.js"><\/script>');</script>
+<script src="config.js"></script>
+</head>
+<body>
+
+<div class="auth-screen" id="loginScreen">
+  <div class="auth-container">
+    <div class="auth-logo"></div>
+    <div class="auth-title">إدارة صيدلية عوف</div>
+    <div class="auth-subtitle">لوحة الإدارة والمراقبة</div>
+    <div class="auth-fg"><label>رقم الهاتف</label><div class="input-wrapper"><i class="fa-solid fa-phone"></i><input type="tel" id="loginPhone" placeholder="أدخل رقم الهاتف المسجل" inputmode="numeric" autocomplete="username"></div></div>
+    <div class="auth-fg"><label>كلمة المرور</label><div class="input-wrapper"><i class="fa-solid fa-lock"></i><input type="password" id="loginPassword" placeholder="أدخل كلمة المرور" style="padding-left:38px;" autocomplete="current-password"><button type="button" class="pw-toggle-btn" data-act="togglePw" data-target="loginPassword"><i class="fa-solid fa-eye"></i></button></div></div>
+    <div class="auth-btns">
+      <button class="act-btn pri" id="loginBtn" data-act="login"><i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول</button>
+      <button class="act-btn sec" data-act="showRegister"><i class="fa-solid fa-user-plus"></i> سجل كمسؤول إداري جديد</button>
+    </div>
+    <div class="cfg-warn" id="cfgWarn" hidden>⚠️ رابط السكربت (MANAGER_URL) لسه مش متضبط في config.js</div>
+  </div>
+</div>
+
+<div class="auth-screen" id="registerScreen" style="display:none;">
+  <div class="auth-container" style="margin:auto 0;">
+    <div class="auth-logo"></div>
+    <div class="auth-title">انضمام مسؤول إداري</div>
+    <div class="auth-subtitle">سجل بياناتك للانضمام لفريق إدارة صيدلية عوف</div>
+    <div class="auth-fg"><label>الاسم بالكامل</label><div class="input-wrapper"><i class="fa-solid fa-user"></i><input type="text" id="regName" placeholder="الاسم ثلاثي أو رباعي"></div></div>
+    <div class="auth-fg"><label>رقم التليفون</label><div class="input-wrapper"><i class="fa-solid fa-phone"></i><input type="tel" id="regPhone" inputmode="numeric" maxlength="11"></div></div>
+    <div class="auth-fg"><label>كلمة المرور</label><div class="input-wrapper"><i class="fa-solid fa-lock"></i><input type="password" id="regPassword" style="padding-left:38px;"><button type="button" class="pw-toggle-btn" data-act="togglePw" data-target="regPassword"><i class="fa-solid fa-eye"></i></button></div></div>
+    <div class="auth-fg"><label>العنوان بالكامل</label><div class="input-wrapper"><i class="fa-solid fa-map-location-dot"></i><input type="text" id="regAddress"></div></div>
+    <div class="auth-fg"><label>الرقم القومي</label><div class="input-wrapper"><i class="fa-solid fa-id-card"></i><input type="tel" id="regIdCard" maxlength="14" inputmode="numeric"></div></div>
+    <div class="auth-fg"><label>تاريخ الميلاد</label><div class="input-wrapper"><i class="fa-solid fa-calendar-days"></i><input type="date" id="regBirthDate"></div></div>
+    <div class="auth-fg"><label>السن الحالي</label><div class="input-wrapper"><i class="fa-solid fa-cake-candles"></i><input type="number" id="regAge" readonly></div></div>
+    <div class="auth-btns">
+      <button class="act-btn pri" id="regBtn" data-act="register"><i class="fa-solid fa-cloud-arrow-up"></i> إرسال طلب الانضمام</button>
+      <button class="act-btn sec" data-act="showLogin"><i class="fa-solid fa-arrow-right"></i> العودة لتسجيل الدخول</button>
+    </div>
+  </div>
+</div>
+
+<div class="auth-screen" id="suspendedScreen" style="display:none;z-index:6100;">
+  <div class="auth-container">
+    <div class="auth-logo"></div>
+    <div class="auth-title" style="color:var(--danger);" id="suspTitle">تم إيقاف حسابك</div>
+    <div class="auth-subtitle" id="suspMsg">يرجى التواصل مع الإدارة</div>
+    <button class="act-btn pri" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> موافق</button>
+  </div>
+</div>
+
+<div class="bg-orb bg-orb-1"></div><div class="bg-orb bg-orb-2"></div>
+
+<header class="app-hdr">
+  <div><button class="menu-btn" data-act="openDrawer"><i class="fa-solid fa-bars"></i></button></div>
+  <div class="hdr-sync"><div style="display:flex;align-items:center;gap:5px;"><div class="sync-dot" id="syncDot"></div><span class="sync-txt" id="syncTxt">جارٍ التحميل...</span></div><button class="ref-btn" id="refBtn" data-act="refresh"><i class="fa-solid fa-arrows-rotate"></i></button></div>
+  <div class="hdr-title"><i class="fa-solid fa-shield-halved"></i> إدارة صيدلية عوف</div>
+</header>
+
+<div class="drawer-overlay" id="drawerOverlay" data-act="closeDrawer"></div>
+<div class="drawer-panel" id="drawerPanel">
+  <div class="drawer-hdr"><div class="drawer-logo"></div><div class="drawer-hdr-text"><h3>إدارة صيدلية عوف</h3><p>لوحة الإدارة والمراقبة</p></div></div>
+  <div class="drawer-items">
+    <div class="drawer-item" data-act="page" data-page="profile"><i class="fa-solid fa-user-gear"></i><span>الصفحة الشخصية</span></div>
+    <div class="drawer-item" data-act="page" data-page="about"><i class="fa-solid fa-circle-info"></i><span>حول</span></div>
+    <div class="drawer-divider"></div>
+    <div class="drawer-brand">صيدلية عوف</div>
+    <div class="drawer-item" data-act="page" data-page="management"><i class="fa-solid fa-user-tie"></i><span>الإدارة والتعيين</span></div>
+    <div class="drawer-item" data-act="page" data-page="trackPilots"><i class="fa-solid fa-route"></i><span>متابعة الطيارين</span></div>
+    <div class="drawer-item" data-act="page" data-page="monitorStaff"><i class="fa-solid fa-headset"></i><span>متابعة الموظفين</span></div>
+    <div class="drawer-item" data-act="page" data-page="trackContractors"><i class="fa-solid fa-handshake"></i><span>متابعة المتعاقدين</span></div>
+  </div>
+  <div class="drawer-footer" id="drawerFooterVersion">إدارة صيدلية عوف</div>
+</div>
+
+<div class="sub-nav" id="subNav" style="display:none;"></div>
+<main class="main" id="mainContent"></main>
+<div class="toast-wrap" id="toastWrap"></div>
+<div class="modal-bg" id="modalBg" data-act="modalBg"><div class="modal-box" id="modalBox"></div></div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
