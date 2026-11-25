@@ -391,12 +391,24 @@
     if (o.stage === "accepted" && o.shopEta) return /وصل/.test(o.shopEta) ? '<div class="etab ok"><i class="fa-solid fa-store"></i> المندوب وصل الصيدلية ✅</div>' : '<div class="etab"><i class="fa-solid fa-store"></i> وصول المندوب للصيدلية خلال: ' + esc(o.shopEta) + "</div>";
     return "";
   }
+  // العنوان: السطر الأول لحد أول "علامة بداية جديدة" (عزبة/شارع/عمارة/فاصلة...) والباقي في السطر اللي تحته
+  var ADDR_BRK = /\s*[-–—،,\/]\s+|\s(?=(?:عزبة|قرية|كفر|نجع|شارع|ش\d|ش\s|عمارة|برج|حارة|دور|الدور|شقة|منزل|بيت)(?:\s|\d|$))/g;
+  function addrLines(o) {
+    var street = String(o.street || "").replace(/\s+/g, " ").trim(), first = street, rest = "", m;
+    ADDR_BRK.lastIndex = 0;
+    while ((m = ADDR_BRK.exec(street))) {
+      if (m.index >= 4 && m.index < street.length - 2) { first = street.slice(0, m.index).trim(); rest = street.slice(m.index + m[0].length).trim(); break; }
+      if (m[0].length === 0) ADDR_BRK.lastIndex++;
+    }
+    var l1 = [o.area, first].filter(Boolean).join(" — ");
+    return [l1, rest].filter(Boolean);
+  }
   function custBlock(o) {
-    var addr = [o.area, o.street].filter(Boolean).join(" — "), url = mapsUrl(o.cloc);
+    var url = mapsUrl(o.cloc), lines = addrLines(o);
     var btns = o.phone ? '<div class="cbtns"><a class="ib call" href="tel:' + esc(o.phone) + '" aria-label="اتصال"><i class="fa-solid fa-phone"></i></a><a class="ib wa" href="' + esc(waUrl(o.phone)) + '" target="_blank" rel="noopener" aria-label="واتساب"><i class="fa-brands fa-whatsapp"></i></a></div>' : "";
     var map = url ? '<div class="mapcol"><a class="ib map" href="' + esc(url) + '" target="_blank" rel="noopener" aria-label="الموقع على الخريطة"><i class="fa-solid fa-location-dot"></i></a>' + (o.km > 0 ? '<span class="kmtag">' + o.km.toFixed(3) + " كم</span>" : "") + "</div>" : "";
-    return '<div class="ic-sec"><div class="ic-row"><div class="ic-txt"><span class="ic-lbl">اسم العميل :</span><b class="ic-name">' + esc(o.name || "—") + "</b></div>" + btns + "</div>" +
-      '<div class="ic-row ic-adr"><div class="ic-txt"><span class="ic-lbl">العنوان :</span><div class="ic-addr">' + esc(addr || "—") + "</div>" + (o.landmark ? "<small>علامة مميزة : " + esc(o.landmark) + "</small>" : "") + "</div>" + map + "</div></div>";
+    return '<div class="ic-sec"><div class="ic-row"><div class="ic-txt"><div class="ic-lbl">اسم العميل :</div><div class="ic-name">' + esc(o.name || "—") + "</div></div>" + btns + "</div>" +
+      '<div class="ic-row ic-adr"><div class="ic-txt"><div class="ic-lbl">العنوان :</div><div class="ic-addr">' + (lines.length ? lines.map(esc).join("<br>") : "—") + "</div>" + (o.landmark ? "<small>علامة مميزة : " + esc(o.landmark) + "</small>" : "") + "</div>" + map + "</div></div>";
   }
   function pilotBox(o) {
     var L = splitLabel(o.pilotName), p = pilotBy(o.pilotPhone), veh = L.veh || (p && p.vehicle) || "—";
@@ -405,8 +417,10 @@
   }
   function prevRows(o) {
     var r = "";
-    [[o.prev1, o.prev1Phone, "الطيار 1 (سابق)"], [o.prev2, o.prev2Phone, "الطيار 2 (سابق)"]].forEach(function (x) {
-      if (x[0]) r += '<div class="prow"><span>' + x[2] + " : <b>" + esc(x[0]) + "</b></span>" + (x[1] ? '<a class="ib call" href="tel:' + esc(x[1]) + '"><i class="fa-solid fa-phone"></i></a>' : "") + "</div>";
+    [[o.prev1, o.prev1Phone, "الطيار السابق 1 :"], [o.prev2, o.prev2Phone, "الطيار السابق 2 :"]].forEach(function (x) {
+      if (!x[0]) return; var L = splitLabel(x[0]), p = pilotBy(x[1]), veh = L.veh || (p && p.vehicle) || "—";
+      r += '<div class="pbox prev"><div class="ptxt"><div class="ptitle">' + x[2] + '</div><div><span class="pl">الطيار :</span><b>' + esc(L.name || "—") + '</b></div><div><span class="pl">المركبة :</span><b>' + esc(veh) + "</b></div></div>" +
+        (x[1] ? '<a class="ib call" href="tel:' + esc(x[1]) + '" aria-label="اتصال"><i class="fa-solid fa-phone"></i></a>' : "") + "</div>";
     });
     return r;
   }
@@ -516,7 +530,7 @@
       '<div class="pk-list">' + rows + "</div>" +
       '<div class="pk-sel">' + (sel ? "الطيار الجديد: <b>" + esc(sel.p.name) + " - " + esc(sel.p.vehicle || "—") + "</b>" : "اختر طيارًا (متاح أو شبه متاح) من القائمة") + "</div>" +
       '<div class="pk-btns"><button class="act-btn pri"' + (sel ? "" : " disabled") + ' data-act="pickConfirm"><i class="fa-solid fa-check"></i> تأكيد التحويل</button><button class="act-btn dan" data-act="pickWithdraw"><i class="fa-solid fa-rotate-left"></i> سحب الطلب</button></div>' +
-      '<div class="modal-btns" style="margin-top:8px;"><button class="act-btn sec" style="flex:1;" data-act="closeModal">إغلاق</button></div>';
+      '<button class="pk-x" data-act="closeModal" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>';
     var nl = box.querySelector(".pk-list"); if (nl) nl.scrollTop = st; box.classList.add("tall");
   }
   function orderBy(bon) { var f = null; (S.orders || []).forEach(function (o) { if (o.bon === Number(bon)) f = o; }); return f; }
