@@ -64,8 +64,11 @@
 <div class="bg-orb bg-orb-1"></div><div class="bg-orb bg-orb-2"></div>
 
 <header class="app-hdr">
-  <div><button class="menu-btn" data-act="openDrawer"><i class="fa-solid fa-bars"></i></button></div>
-  <div class="hdr-sync"><div style="display:flex;align-items:center;gap:5px;"><div class="sync-dot" id="syncDot"></div><span class="sync-txt" id="syncTxt">جارٍ التحميل...</span></div><button class="ref-btn" id="refBtn" data-act="refresh"><i class="fa-solid fa-arrows-rotate"></i></button></div>
+  <div class="hdr-left">
+    <button class="menu-btn" data-act="openDrawer" aria-label="القائمة"><i class="fa-solid fa-bars"></i></button>
+    <button class="netb ok" id="netBtn" data-act="netInfo" aria-label="حالة الاتصال"></button>
+    <button class="ref-btn" id="refBtn" data-act="refresh" aria-label="تحديث"><i class="fa-solid fa-arrows-rotate"></i></button>
+  </div>
   <div class="hdr-title"><i class="fa-solid fa-shield-halved"></i> إدارة صيدلية عوف</div>
 </header>
 
