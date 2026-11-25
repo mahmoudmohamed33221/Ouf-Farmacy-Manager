@@ -5,10 +5,10 @@ self.APP_CONFIG = {
   APP_NAME: "إدارة صيدلية عوف",
 
   // رابط سكربت الإدارة (Apps Script Web App - ملف backend/manager.gs). اتركه فاضي لحد ما تنشره، وبعدين الصق الرابط هنا.
-  MANAGER_URL: "https://script.google.com/macros/s/AKfycbwMM7976ZTjonsdcgw2UQc8EQ2QYKSYi8hnlYI0cLK413fcy1sPRTXBS6blNyvbJqo/exec",
+  MANAGER_URL: "https://script.google.com/macros/s/AKfycbwpDKBzVxK_JnPi17_RQeUN9Mk7GcCaEMeWDzz2hv217VKhdownm4JolrlXEemLUn0/exec",
 
   POLL_MS: 10000,   // كل كام ملّي ثانية البرنامج يحدّث البيانات (والتطبيق ظاهر)
 
-  APP_VERSION: "1.0.0",
+  APP_VERSION: "1.1.0",
   BUILD: "__BUILD__"   // بيتستبدل تلقائي عند كل نشر على GitHub
 };
