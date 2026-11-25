@@ -17,7 +17,7 @@
 var SPREADSHEET_ID = "199-5mWgHEsepqmA8b5CmONGD8sBGctxKyoKBeFN-Otk";   // نفس شيت الصيدلية
 var TZ = "Africa/Cairo";
 var ADMIN_TAB = "إدارة صيدلية عوف", PIL_TAB = "الطيارين", CUS_TAB = "العملاء", ORD_TAB = "الطلبات", ARC_TAB = "الطلبات المكتملة";
-var APP_VERSION = "1.0.0";
+var APP_VERSION = "1.1.0";
 var LOGIN_MAX_FAILS = 8;
 var ARCHIVE_LIMIT = 150;               // أقصى عدد طلبات مكتملة بتتعرض (الأحدث أولًا)
 
@@ -138,7 +138,7 @@ function styleAdminRow_(sh, r) {
 // ===================== الراوتر =====================
 function doGet() { return out_({ ok: true, service: "ouf-manager", version: APP_VERSION }); }
 
-var WRITES_ = { updatePersonStatus: 1, updatePersonInfo: 1, updateCustomerStatus: 1, reassignPilot: 1 };
+var WRITES_ = { updatePersonStatus: 1, updatePersonInfo: 1, updateCustomerStatus: 1, reassignPilot: 1, withdrawOrder: 1, cancelOrder: 1 };
 function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents), a = d.action;
@@ -146,14 +146,16 @@ function doPost(e) {
     if (a === "adminRegister") return out_(withLock_(function () { return adminRegister_(d); }));
     var bad = authed_(d); if (bad) return out_(bad);
     if (a === "adminStatus") return out_({ status: "active" });
-    if (a === "getPeopleList") return out_({ status: "success", list: getPilots_(String(d.status || "")) });
+    if (a === "getPeopleList" || a === "getPilots") return out_({ status: "success", list: getPilots_() });
     if (a === "getCustomers") return out_({ status: "success", list: getCustomers_() });
     if (a === "getOrdersForAdmin") return out_(getOrders_(String(d.phase || "new")));
     if (WRITES_[a]) return out_(withLock_(function () {
       if (a === "updatePersonStatus") return updatePilotStatus_(normPhone_(d.phone), d.requestStatus, d.personStatus);
       if (a === "updatePersonInfo") return updatePilotInfo_(normPhone_(d.originalPhone), d.fields || {});
       if (a === "updateCustomerStatus") return updateCustomer_(normPhone_(d.phone), d.status, d.prog);
-      return reassignPilot_(d.bon, normPhone_(d.pilotPhone));
+      if (a === "reassignPilot") return reassignPilot_(d.bon, normPhone_(d.pilotPhone));
+      if (a === "withdrawOrder") return withdrawOrder_(d.bon);
+      return cancelOrder_(d.bon);
     }));
     return out_({ status: "error", message: "أمر غير معروف" });
   } catch (err) { return out_({ status: "error", message: String(err) }); }
@@ -166,20 +168,16 @@ function pilotLast_(sh) {
   for (var i = v.length - 1; i >= 0; i--) if (String(v[i][0]).trim() !== "") return i + 2;
   return 1;
 }
-function getPilots_(filter) {
+function getPilots_() {                     // كل الطيارين (التقسيم لقوائم بيتم في التطبيق علشان التعديل اللحظي)
   var sh = tab_(PIL_TAB); if (!sh) return [];
   var last = pilotLast_(sh); if (last < 2) return [];
   var rows = sh.getRange(2, 1, last - 1, PIL_COLS).getDisplayValues(), out = [];
   for (var i = 0; i < rows.length; i++) {
-    var r = rows[i], rq = String(r[P.REQ - 1]).trim();
-    if (filter === "pending" && rq !== "منتظر") continue;
-    if (filter === "accepted" && !isAcc_(rq)) continue;
-    if (filter === "rejected" && rq !== "مرفوض") continue;
+    var r = rows[i];
     out.push({ phone: normPhone_(r[P.PHONE - 1]) || r[P.PHONE - 1], name: r[P.NAME - 1], password: r[P.PASS - 1], address: r[P.ADDR - 1], idCard: r[P.ID - 1],
-      birthDate: r[P.BIRTH - 1], age: r[P.AGE - 1], vehicle: r[P.VEH - 1], requestStatus: rq, assignDate: r[P.REQ_AT - 1], personStatus: String(r[P.STATE - 1]).trim(),
-      shift: String(r[P.SHIFT - 1]).trim(), wallet: Number(r[P.WALLET - 1]) || 0 });
+      birthDate: r[P.BIRTH - 1], age: r[P.AGE - 1], vehicle: r[P.VEH - 1], requestStatus: String(r[P.REQ - 1]).trim(), assignDate: r[P.REQ_AT - 1],
+      personStatus: String(r[P.STATE - 1]).trim(), shift: String(r[P.SHIFT - 1]).trim(), wallet: Number(r[P.WALLET - 1]) || 0 });
   }
-  if (filter === "pending") out.reverse();
   return out;
 }
 function findPilotRow_(sh, phone) {
@@ -264,6 +262,19 @@ function dataLast_(sh) {                    // آخر صف فيه أوردر ف�
   return 1;
 }
 function num_(v) { var n = Number(v); return isFinite(n) ? n : NaN; }
+var AR_DAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+// تاريخ ووقت الطلب من النص المعروض في الخلية (نفس منطق تطبيق الطيار)
+function orderTime_(dispD, dispT) {
+  var y = 0, mo = 0, da = 0, h = -1, mi = 0, m;
+  if ((m = String(dispD || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/))) { da = +m[1]; mo = +m[2]; y = +m[3]; }
+  else if ((m = String(dispD || "").match(/(\d{4})-(\d{1,2})-(\d{1,2})/))) { y = +m[1]; mo = +m[2]; da = +m[3]; }
+  var ts = String(dispT || "");
+  if ((m = ts.match(/(\d{1,2}):(\d{2})/))) { h = +m[1]; mi = +m[2]; var pm = /م|PM/i.test(ts), am = /ص|AM/i.test(ts); if (pm && h < 12) h += 12; if (am && h === 12) h = 0; }
+  if (!y || h < 0) return { day: "", dateTxt: String(dispD || ""), timeTxt: String(dispT || ""), ageMin: -1, ms: 0 };
+  var pad = function (n) { return (n < 10 ? "0" : "") + n; }, ms = 0, age = -1;
+  try { ms = Utilities.parseDate(y + "-" + pad(mo) + "-" + pad(da) + " " + pad(h) + ":" + pad(mi), TZ, "yyyy-MM-dd HH:mm").getTime(); age = Math.max(0, Math.floor((Date.now() - ms) / 60000)); } catch (e) {}
+  return { day: AR_DAYS[new Date(y, mo - 1, da).getDay()], dateTxt: pad(da) + "/" + pad(mo) + "/" + y, timeTxt: pad(h % 12 || 12) + ":" + pad(mi) + " " + (h < 12 ? "ص" : "م"), ageMin: age, ms: ms };
+}
 function orderObj_(rv, dv) {
   var goods = num_(rv[O_GOODS - 1]), fee = num_(rv[O_FEE - 1]);
   if (!isFinite(goods)) {                   // احتياطي: من نص "ح 1150 + ت 100 = ا 1250"
@@ -271,24 +282,30 @@ function orderObj_(rv, dv) {
     goods = m ? Number(m[1]) : (Number(String(dv[O.TOTAL - 1]).replace(/[^\d.]/g, "")) || 0); fee = m ? Number(m[2]) : 0;
   }
   if (!isFinite(fee)) fee = 0;
-  var dash = function (a, b) { return String(a || "").trim() ? String(a).trim() + (String(b || "").trim() ? " - " + String(b).trim() : "") : ""; };
-  return { bon: Number(rv[O.BON - 1]), date: dv[O.DATE - 1], time: dv[O.TIME - 1], name: dv[O.NAME - 1], phone: normPhone_(dv[O.PHONE - 1]), area: dv[O.AREA - 1], street: dv[O.STREET - 1],
-    landmark: dv[O.LANDMARK - 1], cloc: String(dv[O.CLOC - 1] || "").trim(), details: dv[O.DETAILS - 1], note: dv[O.NOTE - 1],
-    goods: goods, fee: fee, total: Math.round((goods + fee) * 100) / 100,
-    accepted: isTrue_(rv[O.ACCEPT - 1]), prep: isTrue_(rv[O.PREP - 1]), deliv: isTrue_(rv[O.DELIV - 1]),
-    pilotName: String(dv[O.PNAME - 1] || "").trim(), pilotPhone: normPhone_(dv[O.PPHONE - 1]),
-    prev1: dash(dv[O.P1N - 1], dv[O.P1P - 1]), prev2: dash(dv[O.P2N - 1], dv[O.P2P - 1]),
-    shopEta: String(dv[O.SHOP_ETA - 1] || "").trim(), custEta: String(dv[O.CUST_ETA - 1] || "").trim() };
+  var tm = orderTime_(dv[O.DATE - 1], dv[O.TIME - 1]), s = function (c) { return String(dv[c - 1] == null ? "" : dv[c - 1]).trim(); };
+  var stage = isTrue_(rv[O.DELIV - 1]) ? "delivering" : (isTrue_(rv[O.PREP - 1]) ? "preparing" : (isTrue_(rv[O.ACCEPT - 1]) ? "accepted" : "new"));
+  return { bon: Number(rv[O.BON - 1]), stage: stage, day: tm.day, dateTxt: tm.dateTxt, timeTxt: tm.timeTxt, ageMin: tm.ageMin, orderMs: tm.ms,
+    name: s(O.NAME), phone: normPhone_(dv[O.PHONE - 1]), area: s(O.AREA), street: s(O.STREET), landmark: s(O.LANDMARK), cloc: s(O.CLOC),
+    items: String(dv[O.DETAILS - 1] || ""), note: s(O.NOTE), km: Number(rv[O_KM - 1]) || 0, goods: goods, fee: fee, total: Math.round((goods + fee) * 100) / 100,
+    pilotName: s(O.PNAME), pilotPhone: normPhone_(dv[O.PPHONE - 1]),
+    prev1: s(O.P1N) === "--" ? "" : s(O.P1N), prev1Phone: normPhone_(dv[O.P1P - 1]), prev2: s(O.P2N) === "--" ? "" : s(O.P2N), prev2Phone: normPhone_(dv[O.P2P - 1]),
+    shopEta: s(O.SHOP_ETA), custEta: s(O.CUST_ETA), arrived: !!rv[O_ARR - 1] };
 }
 function getOrders_(phase) {
-  var ss = ss_(), list = [];
+  var list = [];
   if (phase === "delivered") {
     var arc = tab_(ARC_TAB); if (!arc || arc.getLastRow() < 2) return { status: "success", list: [] };
     var last = arc.getLastRow(), from = Math.max(2, last - ARCHIVE_LIMIT + 1), n = last - from + 1;
     var rg = arc.getRange(from, 1, n, A_AT), av = rg.getValues(), ad = rg.getDisplayValues();
     for (var a = av.length - 1; a >= 0; a--) {
       var o = orderObj_(av[a], ad[a]); if (isNaN(o.bon)) continue;
-      var at = av[a][A_AT - 1]; o.archivedAt = at instanceof Date ? Utilities.formatDate(at, TZ, "dd/MM/yyyy hh:mm a") : String(ad[a][A_AT - 1] || "");
+      o.stage = "delivered";
+      var at = av[a][A_AT - 1], d = at instanceof Date ? at : null;
+      if (d) {
+        o.doneMs = d.getTime(); o.doneDay = AR_DAYS[Number(Utilities.formatDate(d, TZ, "u")) % 7]; o.doneDateTxt = Utilities.formatDate(d, TZ, "dd/MM/yyyy");
+        o.doneTimeTxt = Utilities.formatDate(d, TZ, "hh:mm") + " " + (Utilities.formatDate(d, TZ, "a") === "AM" ? "ص" : "م");
+        o.durMin = o.orderMs ? Math.max(0, Math.round((o.doneMs - o.orderMs) / 60000)) : -1;
+      } else { o.doneDay = ""; o.doneDateTxt = String(ad[a][A_AT - 1] || ""); o.doneTimeTxt = ""; o.durMin = -1; }
       list.push(o);
     }
     return { status: "success", list: list };
@@ -298,22 +315,30 @@ function getOrders_(phase) {
   var r2 = sh.getRange(2, 1, lr - 1, O_ARR), vals = r2.getValues(), disp = r2.getDisplayValues();
   for (var i = vals.length - 1; i >= 0; i--) {
     if (vals[i][O.BON - 1] === "" || isTrue_(vals[i][O.DONE - 1])) continue;
-    var ob = orderObj_(vals[i], disp[i]), ok = false;
-    if (phase === "new") ok = !ob.accepted;
-    else if (phase === "accepted") ok = ob.accepted && !ob.prep;
-    else if (phase === "preparing") ok = ob.prep && !ob.deliv;
-    else if (phase === "delivering") ok = ob.deliv;
-    if (ok) list.push(ob);
+    list.push(orderObj_(vals[i], disp[i]));
   }
-  var res = { status: "success", list: list };
-  if (phase === "accepted") res.avail = availPilots_();
-  return res;
+  return { status: "success", list: list };     // كل الطلبات الجارية (جديدة/مقبولة/تجهيز/توصيل)، والتقسيم في التطبيق
 }
-
-// الطيارين المتاحين: مقبول + حالتهم يعمل + شيفتهم "يعمل الان" (نفس شروط قائمة الشيت)
-function availPilots_() {
-  return getPilots_("accepted").filter(function (p) { return p.personStatus === "يعمل" && p.shift === "يعمل الان"; })
-    .map(function (p) { return { name: p.name, phone: p.phone, label: p.name + (p.vehicle ? " - " + p.vehicle : "") }; });
+function pilotLabel_(name, veh) { return String(name) + (veh ? " - " + veh : ""); }
+function workingPilot_(phone) {             // الطيار المتاح للتعيين: مقبول + يعمل + شيفت "يعمل الان"
+  var all = getPilots_();
+  for (var i = 0; i < all.length; i++) if (all[i].phone === phone && isAcc_(all[i].requestStatus) && all[i].personStatus === "يعمل" && all[i].shift === "يعمل الان") return all[i];
+  return null;
+}
+function orderRow_(sh, bon) {
+  var lr = dataLast_(sh); if (lr < 2) return 0;
+  var b = sh.getRange(2, O.BON, lr - 1, 1).getValues();
+  for (var i = 0; i < b.length; i++) if (Number(b[i][0]) === Number(bon)) return i + 2;
+  return 0;
+}
+function styleOrderRow_(sh, r) {            // نفس ألوان تطبيق الطيار
+  var v = sh.getRange(r, 1, 1, O.DONE).getValues()[0], bg = "#0B0F19", fg = "#F3F4F6";
+  if (isTrue_(v[O.DONE - 1])) { bg = "#1F2937"; fg = "#9CA3AF"; }
+  else if (isTrue_(v[O.DELIV - 1])) { bg = "#ADFF2F"; fg = "#111827"; }
+  else if (isTrue_(v[O.PREP - 1])) { bg = "#E0F2FE"; fg = "#111827"; }
+  else if (isTrue_(v[O.ACCEPT - 1])) { bg = "#064E3B"; fg = "#F3F4F6"; }
+  sh.getRange(r, 1, 1, O.STEPS).setBackground(bg).setFontColor(fg).setVerticalAlignment("middle").setBorder(true, true, true, true, true, true, "#4B5563", SpreadsheetApp.BorderStyle.SOLID);
+  sh.getRange(r, O.DETAILS).setWrap(true);
 }
 function pushPrev_(sh, r, name, phone) {    // نفس منطق تطبيق الطيار: السابق 1 ثم 2، وآخر اتنين بس
   name = String(name || "").trim(); if (!name) return;
@@ -323,24 +348,41 @@ function pushPrev_(sh, r, name, phone) {    // نفس منطق تطبيق الط
   else { v[0] = v[2]; v[1] = v[3]; v[2] = name; v[3] = phone; }
   rg.setNumberFormat("@"); rg.setValues([[String(v[0]), String(v[1]), String(v[2]), String(v[3])]]);
 }
+// تحويل الطلب لطيار تاني (في أي مرحلة: مقبول / تجهيز / توصيل). مرحلة الطلب بتفضل زي ما هي والطيار الجديد بيكمل منها.
 function reassignPilot_(bon, pilotPhone) {
-  var sh = tab_(ORD_TAB), pil = tab_(PIL_TAB);
-  if (!sh || !pil) return { status: "error", message: "الورقة غير موجودة" };
-  var lr = dataLast_(sh), row = 0;
-  if (lr >= 2) { var b = sh.getRange(2, O.BON, lr - 1, 1).getValues(); for (var i = 0; i < b.length; i++) if (Number(b[i][0]) === Number(bon)) { row = i + 2; break; } }
-  if (!row) return { status: "error", message: "الطلب غير موجود (يمكن اتسلّم أو اتلغى)" };
+  var sh = tab_(ORD_TAB); if (!sh) return { status: "error", message: "ورقة الطلبات غير موجودة" };
+  var row = orderRow_(sh, bon); if (!row) return { status: "error", message: "الطلب غير موجود (يمكن اتسلّم أو اتلغى)" };
   var rv = sh.getRange(row, 1, 1, O_ARR).getValues()[0];
   if (!isTrue_(rv[O.ACCEPT - 1])) return { status: "error", message: "الطلب لسه ما اتقبلش من طيار" };
-  if (isTrue_(rv[O.PREP - 1]) || isTrue_(rv[O.DELIV - 1])) return { status: "error", message: "مينفعش التحويل بعد بدء التجهيز" };
-  var np = null, av = availPilots_();
-  for (var k = 0; k < av.length; k++) if (av[k].phone === pilotPhone) np = av[k];
+  var np = workingPilot_(pilotPhone);
   if (!np) return { status: "error", message: "الطيار ده مش متاح دلوقتي (لازم مقبول + يعمل + شيفت يعمل الان)" };
   var oldPhone = normPhone_(rv[O.PPHONE - 1]);
   if (oldPhone === pilotPhone) return { status: "error", message: "الطلب معاه نفس الطيار بالفعل" };
   pushPrev_(sh, row, rv[O.PNAME - 1], oldPhone);          // الطيار القديم يتسجل "سابق"
-  sh.getRange(row, O.PNAME).setValue(np.label);
+  sh.getRange(row, O.PNAME).setValue(pilotLabel_(np.name, np.vehicle));
   sh.getRange(row, O.PPHONE).setNumberFormat("@").setValue(np.phone);
-  sh.getRange(row, O.SHOP_ETA).setValue(""); sh.getRange(row, O.CUST_ETA).setValue("");   // وصول الطيار القديم ميبقاش ظاهر للعميل
+  sh.getRange(row, O.SHOP_ETA).setValue(""); sh.getRange(row, O.CUST_ETA).setValue("");   // وصول الطيار القديم ميبقاش ظاهر
+  sh.getRange(row, O_ARR).setValue("");
+  return { status: "success" };
+}
+// سحب الطلب من الطيار: بيرجع "جديد" ويظهر لكل الطيارين (زي تنازل الطيار بس من الإدارة وفي أي مرحلة)
+function withdrawOrder_(bon) {
+  var sh = tab_(ORD_TAB); if (!sh) return { status: "error", message: "ورقة الطلبات غير موجودة" };
+  var row = orderRow_(sh, bon); if (!row) return { status: "error", message: "الطلب غير موجود (يمكن اتسلّم أو اتلغى)" };
+  var rv = sh.getRange(row, 1, 1, O_ARR).getValues()[0];
+  if (!isTrue_(rv[O.ACCEPT - 1])) return { status: "success" };             // لسه جديد أصلًا
+  pushPrev_(sh, row, rv[O.PNAME - 1], normPhone_(rv[O.PPHONE - 1]));
+  [O.ACCEPT, O.PREP, O.DELIV].forEach(function (c) { sh.getRange(row, c).setValue(false); });
+  [O.PNAME, O.PPHONE, O.SHOP_ETA, O.CUST_ETA, O_ARR].forEach(function (c) { sh.getRange(row, c).setValue(""); });
+  styleOrderRow_(sh, row);
+  return { status: "success" };
+}
+// إلغاء الطلب: بيتشال من شيت "الطلبات" (زي ما الإدارة كانت بتمسح الصف يدويًا)، ومفيش رجوع فيه
+function cancelOrder_(bon) {
+  var sh = tab_(ORD_TAB); if (!sh) return { status: "error", message: "ورقة الطلبات غير موجودة" };
+  var row = orderRow_(sh, bon); if (!row) return { status: "success" };      // اتشال قبل كده
+  if (isTrue_(sh.getRange(row, O.DONE).getValue())) return { status: "error", message: "الطلب اتسلّم بالفعل" };
+  sh.deleteRow(row);
   return { status: "success" };
 }
 
