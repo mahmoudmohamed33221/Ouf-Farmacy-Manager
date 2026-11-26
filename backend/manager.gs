@@ -17,7 +17,7 @@
 var SPREADSHEET_ID = "199-5mWgHEsepqmA8b5CmONGD8sBGctxKyoKBeFN-Otk";   // نفس شيت الصيدلية
 var TZ = "Africa/Cairo";
 var ADMIN_TAB = "إدارة صيدلية عوف", PIL_TAB = "الطيارين", CUS_TAB = "العملاء", ORD_TAB = "الطلبات", ARC_TAB = "الطلبات المكتملة";
-var APP_VERSION = "1.1.0";
+var APP_VERSION = "1.0.2";
 var LOGIN_MAX_FAILS = 8;
 var ARCHIVE_LIMIT = 150;               // أقصى عدد طلبات مكتملة بتتعرض (الأحدث أولًا)
 
@@ -138,7 +138,7 @@ function styleAdminRow_(sh, r) {
 // ===================== الراوتر =====================
 function doGet() { return out_({ ok: true, service: "ouf-manager", version: APP_VERSION }); }
 
-var WRITES_ = { updatePersonStatus: 1, updatePersonInfo: 1, updateCustomerStatus: 1, reassignPilot: 1, withdrawOrder: 1, cancelOrder: 1 };
+var WRITES_ = { updatePersonStatus: 1, updatePersonInfo: 1, updateCustomerStatus: 1, reassignPilot: 1, withdrawOrder: 1, cancelOrder: 1, updateOrderLocation: 1 };
 function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents), a = d.action;
@@ -149,12 +149,14 @@ function doPost(e) {
     if (a === "getPeopleList" || a === "getPilots") return out_({ status: "success", list: getPilots_() });
     if (a === "getCustomers") return out_({ status: "success", list: getCustomers_() });
     if (a === "getOrdersForAdmin") return out_(getOrders_(String(d.phase || "new")));
+    if (a === "resolveLocation") return out_(resolveLocation_(d.loc));
     if (WRITES_[a]) return out_(withLock_(function () {
       if (a === "updatePersonStatus") return updatePilotStatus_(normPhone_(d.phone), d.requestStatus, d.personStatus);
       if (a === "updatePersonInfo") return updatePilotInfo_(normPhone_(d.originalPhone), d.fields || {});
       if (a === "updateCustomerStatus") return updateCustomer_(normPhone_(d.phone), d.status, d.prog);
       if (a === "reassignPilot") return reassignPilot_(d.bon, normPhone_(d.pilotPhone));
       if (a === "withdrawOrder") return withdrawOrder_(d.bon);
+      if (a === "updateOrderLocation") return updateOrderLocation_(d.bon, String(d.which || ""), d.loc);
       return cancelOrder_(d.bon);
     }));
     return out_({ status: "error", message: "أمر غير معروف" });
@@ -289,8 +291,14 @@ function orderObj_(rv, dv) {
     items: String(dv[O.DETAILS - 1] || ""), note: s(O.NOTE), km: Number(rv[O_KM - 1]) || 0, goods: goods, fee: fee, total: Math.round((goods + fee) * 100) / 100,
     pilotName: s(O.PNAME), pilotPhone: normPhone_(dv[O.PPHONE - 1]),
     prev1: s(O.P1N) === "--" ? "" : s(O.P1N), prev1Phone: normPhone_(dv[O.P1P - 1]), prev2: s(O.P2N) === "--" ? "" : s(O.P2N), prev2Phone: normPhone_(dv[O.P2P - 1]),
-    shopEta: s(O.SHOP_ETA), custEta: s(O.CUST_ETA), arrived: !!rv[O_ARR - 1] };
+    shopEta: s(O.SHOP_ETA), custEta: s(O.CUST_ETA), arrived: !!rv[O_ARR - 1], sloc: String(dv[O.SLOC - 1] || "").trim(), accMs: stepsOf_(rv).a, delivMs: stepsOf_(rv).d };
 }
+// أوقات المراحل: عمود STEPS بيتكتب فيه "a:وقت-القبول|d:وقت-بدء-التوصيل" بالمللي ثانية (من تعديل بسيط في سكربت الطلبات، شوف orders-patch.txt)
+function stepsOf_(rv) {
+  var out = { a: 0, d: 0 }; String(rv[O.STEPS - 1] || "").split("|").forEach(function (p) { var x = p.split(":"); if (x[0] === "a" || x[0] === "d") out[x[0]] = Number(x[1]) || 0; });
+  return out;
+}
+function timeTxtMs_(ms) { return ms ? Utilities.formatDate(new Date(ms), TZ, "hh:mm") + " " + (Utilities.formatDate(new Date(ms), TZ, "a") === "AM" ? "ص" : "م") : ""; }
 function getOrders_(phase) {
   var list = [];
   if (phase === "delivered") {
@@ -306,6 +314,7 @@ function getOrders_(phase) {
         o.doneTimeTxt = Utilities.formatDate(d, TZ, "hh:mm") + " " + (Utilities.formatDate(d, TZ, "a") === "AM" ? "ص" : "م");
         o.durMin = o.orderMs ? Math.max(0, Math.round((o.doneMs - o.orderMs) / 60000)) : -1;
       } else { o.doneDay = ""; o.doneDateTxt = String(ad[a][A_AT - 1] || ""); o.doneTimeTxt = ""; o.durMin = -1; }
+      o.accTxt = timeTxtMs_(o.accMs); o.delivDurMin = (d && o.delivMs && d.getTime() >= o.delivMs) ? Math.round((d.getTime() - o.delivMs) / 60000) : -1;
       list.push(o);
     }
     return { status: "success", list: list };
@@ -373,7 +382,7 @@ function withdrawOrder_(bon) {
   if (!isTrue_(rv[O.ACCEPT - 1])) return { status: "success" };             // لسه جديد أصلًا
   pushPrev_(sh, row, rv[O.PNAME - 1], normPhone_(rv[O.PPHONE - 1]));
   [O.ACCEPT, O.PREP, O.DELIV].forEach(function (c) { sh.getRange(row, c).setValue(false); });
-  [O.PNAME, O.PPHONE, O.SHOP_ETA, O.CUST_ETA, O_ARR].forEach(function (c) { sh.getRange(row, c).setValue(""); });
+  [O.PNAME, O.PPHONE, O.SHOP_ETA, O.CUST_ETA, O_ARR, O.STEPS].forEach(function (c) { sh.getRange(row, c).setValue(""); });
   styleOrderRow_(sh, row);
   return { status: "success" };
 }
@@ -384,6 +393,97 @@ function cancelOrder_(bon) {
   if (isTrue_(sh.getRange(row, O.DONE).getValue())) return { status: "error", message: "الطلب اتسلّم بالفعل" };
   sh.deleteRow(row);
   return { status: "success" };
+}
+
+// ===================== تعديل لوكيشن الطلب (محل / عميل) =====================
+// نفس صيغ اللوكيشن اللي بيفهمها سكربت الطلبات (لينكات جوجل/Apple/Waze، geo:، إحداثيات، DMS، Plus Code)
+var OLC_ = "23456789CFGHJMPQRVWX", STORE_COORDS = { lat: 30.121208, lng: 31.2491106 };
+var UA_ = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36";
+function inEgypt_(la, lo) { return isFinite(la) && isFinite(lo) && la >= 21 && la <= 33 && lo >= 24 && lo <= 37.5; }
+function olcEncode_(lat, lng) {
+  lat = Math.min(Math.max(lat, -90), 90) + 90; lng = ((lng + 180) % 360 + 360) % 360;
+  var res = [20, 1, 0.05, 0.0025, 0.000125], out = "";
+  for (var i = 0; i < 5; i++) { var a = Math.floor(lat / res[i]), b = Math.floor(lng / res[i]); lat -= a * res[i]; lng -= b * res[i]; out += OLC_.charAt(a) + OLC_.charAt(b); }
+  return out.slice(0, 8) + "+" + out.slice(8);
+}
+function olcDecode_(code, ref) {
+  code = String(code).toUpperCase().replace(/\s+/g, ""); var p = code.indexOf("+"); if (p < 0) return null;
+  var full = code; if (p < 8) { if (!ref) return null; full = olcEncode_(ref.lat, ref.lng).slice(0, 8 - p) + code; }
+  var d = full.replace("+", ""), res = [20, 1, 0.05, 0.0025, 0.000125], lat = -90, lng = -180, last = 0;
+  for (var i = 0; i < Math.min(d.length, 10) / 2; i++) { var a = OLC_.indexOf(d.charAt(2 * i)), b = OLC_.indexOf(d.charAt(2 * i + 1)); if (a < 0 || b < 0) return null; lat += a * res[i]; lng += b * res[i]; last = res[i]; }
+  return { lat: lat + last / 2, lng: lng + last / 2 };
+}
+function parseCoords_(t) {
+  t = String(t || "").replace(/[٠-٩]/g, function (x) { return "٠١٢٣٤٥٦٧٨٩".indexOf(x); }).replace(/[۰-۹]/g, function (x) { return "۰۱۲۳۴۵۶۷۸۹".indexOf(x); }).replace(/٫/g, ".").replace(/،/g, ",");
+  var vs = [t]; try { var d = decodeURIComponent(t); if (d !== t) vs.push(d); } catch (e) {}
+  var ok = function (la, ln) { la = +la; ln = +ln; return inEgypt_(la, ln) ? { lat: la, lng: ln } : null; };
+  var pats = [
+    /!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/,
+    /[?&#](?:q|ll|query|destination|daddr|saddr|sll|center|coordinate|coord|latlng|dest|to)=(?:loc:|geo:)?\s*(-?\d{1,3}\.\d+)\s*[,;]\s*(-?\d{1,3}\.\d+)/i,
+    /[?&](?:lat|latitude)=(-?\d{1,3}\.\d+)&(?:lng|lon|long|longitude)=(-?\d{1,3}\.\d+)/i,
+    /geo:(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)/,
+    /\/(?:place|search|dir|maps|ll)\/(?:[^\/@?]*\/)?(-?\d{1,3}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/,
+    /@(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)/,
+    /^\s*(-?\d{1,3}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})\s*$/,
+    /(?:^|[^\d.])(-?\d{1,3}\.\d{4,})\s*°?\s*N?\s*[,;\s]\s*(-?\d{1,3}\.\d{4,})\s*°?\s*E?(?![\d.])/i
+  ];
+  for (var v = 0; v < vs.length; v++) {
+    for (var i = 0; i < pats.length; i++) { var m = vs[v].match(pats[i]); var r = m && ok(m[1], m[2]); if (r) return r; }
+    var m2 = vs[v].match(/!1d(-?\d{1,3}\.\d+)!2d(-?\d{1,3}\.\d+)/); var r2 = m2 && ok(m2[2], m2[1]); if (r2) return r2;
+    var dm = vs[v].match(/(\d{1,2})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:"|″|'')?\s*([NS])?[\s,;]*(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:"|″|'')?\s*([EW])?/i);
+    if (dm) { var la = +dm[1] + dm[2] / 60 + dm[3] / 3600, ln = +dm[5] + dm[6] / 60 + dm[7] / 3600; if (/s/i.test(dm[4] || "")) la = -la; if (/w/i.test(dm[8] || "")) ln = -ln; var r3 = ok(la, ln); if (r3) return r3; }
+    var pc = vs[v].match(/(?:^|[\s(,:])((?:[23456789CFGHJMPQRVWX]{2,8})\+[23456789CFGHJMPQRVWX]{2,3})(?=$|[\s,)])/i);
+    if (pc) { var o = olcDecode_(pc[1], STORE_COORDS); var r4 = o && ok(o.lat, o.lng); if (r4) return r4; }
+  }
+  return null;
+}
+function bodyCoords_(b) {
+  var m = String(b).match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/) || String(b).match(/"latitude"\s*:\s*(-?\d{1,3}\.\d+)\s*,\s*"longitude"\s*:\s*(-?\d{1,3}\.\d+)/) ||
+    String(b).match(/itemprop="latitude"\s+content="(-?\d{1,3}\.\d+)"[^>]*itemprop="longitude"\s+content="(-?\d{1,3}\.\d+)"/) || String(b).match(/center=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/);
+  return m && inEgypt_(+m[1], +m[2]) ? { lat: +m[1], lng: +m[2] } : null;
+}
+function resolveMapsLink_(url) {            // لينك مختصر ← بنمشي ورا التحويلات لحد ما نلاقي الإحداثيات
+  var cur = url, res = null;
+  for (var i = 0; i < 6 && cur; i++) {
+    var pc = parseCoords_(cur); if (pc) { res = pc; break; }
+    var r = UrlFetchApp.fetch(cur, { followRedirects: false, muteHttpExceptions: true, headers: { "User-Agent": UA_, "Accept-Language": "ar,en;q=0.8" } });
+    var code = r.getResponseCode(), h = r.getHeaders() || {}, loc = h["Location"] || h["location"];
+    if (code >= 300 && code < 400 && loc) { cur = /^https?:/i.test(loc) ? loc : (/^\//.test(loc) ? "https://www.google.com" + loc : loc); continue; }
+    var body = String(r.getContentText() || "").slice(0, 400000), bc = bodyCoords_(body);
+    if (bc) { res = bc; break; }
+    var mm = body.match(/https?:\/\/(?:www\.)?google\.[a-z.]+\/maps[^"'<>\s\\]*/i), nx = mm ? mm[0].replace(/&amp;/g, "&") : "";
+    if (nx && nx !== cur) { cur = nx; continue; }
+    break;
+  }
+  return res;
+}
+function coordsOfLoc_(raw) {                // أي نص لوكيشن ← إحداثيات (أو null لو مش مفهوم)
+  var s = txt_(raw, 700), u = s.match(/https?:\/\/[^\s]+/i), url = u ? u[0].replace(/[)\].,،;]+$/, "") : "";
+  var c = parseCoords_(url || s); if (c) return c;
+  if (url) { for (var k = 0; k < 2; k++) { try { var rr = resolveMapsLink_(url); if (rr) return rr; } catch (e) {} if (k === 0) Utilities.sleep(400); } }
+  return null;
+}
+function resolveLocation_(loc) {
+  var c = coordsOfLoc_(loc);
+  return c ? { status: "success", lat: c.lat, lng: c.lng, link: "https://www.google.com/maps?q=" + c.lat + "," + c.lng } : { status: "error", message: "مقدرناش نفهم اللوكيشن ده (لازم يكون داخل مصر وبصيغة مفهومة)" };
+}
+function updateCustomerLoc_(phone, link) {
+  var sh = tab_(CUS_TAB); if (!sh) return; var n = sh.getLastRow(); if (n < 2) return;
+  var v = sh.getRange(2, C.PHONE, n - 1, 1).getValues();
+  for (var i = 0; i < v.length; i++) if (normPhone_(v[i][0]) === phone) { sh.getRange(i + 2, C.LOC).setValue(link); return; }
+}
+// نفس اللي بيحصل لما تغيّر الخلية بإيدك: بنكتب اللوكيشن، ونصفّر التوقيع (علشان مشغّل كل دقيقة في سكربت الطلبات يعيد حساب المسافة والتوصيل)، ونصفّر الوصول
+function updateOrderLocation_(bon, which, loc) {
+  if (which !== "shop" && which !== "cust") return { status: "error", message: "نوع اللوكيشن غير صحيح" };
+  var sh = tab_(ORD_TAB); if (!sh) return { status: "error", message: "ورقة الطلبات غير موجودة" };
+  var row = orderRow_(sh, bon); if (!row) return { status: "error", message: "الطلب غير موجود (يمكن اتسلّم أو اتلغى)" };
+  var c = coordsOfLoc_(loc); if (!c) return { status: "error", message: "مقدرناش نفهم اللوكيشن ده" };
+  var link = "https://www.google.com/maps?q=" + c.lat + "," + c.lng;
+  sh.getRange(row, which === "shop" ? O.SLOC : O.CLOC).setValue(link);
+  sh.getRange(row, O_SIG).clearContent();
+  sh.getRange(row, O_ARR).clearContent(); sh.getRange(row, O.SHOP_ETA).setValue(""); sh.getRange(row, O.CUST_ETA).setValue("");
+  if (which === "cust") updateCustomerLoc_(normPhone_(sh.getRange(row, O.PHONE).getDisplayValue()), link);
+  return { status: "success", link: link };
 }
 
 // ===================== تجهيز ورقة الإدارة (شغّلها مرة) =====================
