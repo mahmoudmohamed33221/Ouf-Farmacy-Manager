@@ -9,7 +9,7 @@
   var PERSON_OPTIONS = ["يعمل", "موقوف مؤقتاً", "موقوف نهائي"];
   var VEHICLES = ["موتوسيكل", "عجلة كهربائية", "عجلة عادية", "سكوتر"];
   var CUST_STATUS = ["جيد", "موقوف"], CUST_PROG = ["يعمل", "حذف"];
-  var STAGE_TAG = { "new": "جديد", accepted: "تم القبول", preparing: "جاري التجهيز", delivering: "جاري التوصيل", delivered: "تم التسليم" };
+  var STAGE_TAG = { "new": "جديد", accepted: "تم القبول", preparing: "جاري التحضير", delivering: "جاري التوصيل", delivered: "تم التسليم" };
 
   var S = {
     page: "management", mgmtTab: "pilots", mgmtSub: "pending", custSub: "ok", selected: null,
@@ -164,13 +164,20 @@
   }
   function renderPage() {
     var sub = $("subNav"), main = $("mainContent");
-    sub.style.display = "none"; main.className = "main";
+    sub.style.display = "none"; main.className = "main"; S.subKind = "";
     ({ profile: renderProfile, about: renderAbout, management: renderManagement, trackPilots: renderTrackPilots, monitorStaff: renderMonitorStaff, trackContractors: renderContractors })[S.page]();
   }
   function soon(title, icon, text) {
-    return '<div class="tab-pane on tab-anim">' + (title ? '<div class="tab-head"><h2><i class="fa-solid ' + icon + '" style="margin-left:6px;color:var(--accent);"></i>' + title + "</h2></div>" : "") +
+    return '<div class="tab-pane on">' + (title ? '<div class="tab-head"><h2><i class="fa-solid ' + icon + '" style="margin-left:6px;color:var(--accent);"></i>' + title + "</h2></div>" : "") +
       '<div class="placeholder-soon"><i class="fa-solid fa-hourglass-half"></i><h2>قريبًا</h2><p>' + text + "</p></div></div>";
   }
+  // الشريط العلوي: بيتبني مرة واحدة لكل صفحة، وبعد كده بنبدّل الاختيار بس (من غير ما يرجع لأوله ولا يعمل "ريفريش")
+  function setChipOn(act, v) { document.querySelectorAll('#subNav .sub-chip[data-act="' + act + '"]').forEach(function (c) { c.classList.toggle("on", c.dataset.v === v); }); var on = document.querySelector("#subNav .sub-chip.on"); if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  function ensureSubNav(kind, items, act, cur) {
+    var sub = $("subNav"); sub.style.display = "flex"; $("mainContent").className = "main with-sub";
+    if (S.subKind !== kind) { sub.innerHTML = chips(items, cur, act); S.subKind = kind; sub.scrollLeft = 0; } else setChipOn(act, cur);
+  }
+  function setSubBtn(act, v) { document.querySelectorAll('.msub .act-btn[data-act="' + act + '"]').forEach(function (b) { var on = b.dataset.v === v; b.classList.toggle("pri", on); b.classList.toggle("sec", !on); }); }
   function chips(items, current, act) {
     return items.map(function (t) {
       return t === "|" ? '<span class="sub-sep"></span>' : '<div class="sub-chip' + (current === t[0] ? " on" : "") + '" data-act="' + act + '" data-v="' + t[0] + '">' + t[1] + "</div>";
@@ -212,13 +219,12 @@
     }).join("") + "</div>";
   }
   function renderManagement() {
-    var sub = $("subNav"), main = $("mainContent"); sub.style.display = "flex"; main.className = "main with-sub";
-    sub.innerHTML = chips(MGMT_TABS, S.mgmtTab, "mgmtTab");
+    var main = $("mainContent"); ensureSubNav("mgmt", MGMT_TABS, "mgmtTab", S.mgmtTab);
     if (S.selected) { renderMgmtDetail(); return; }
     if (S.mgmtTab === "stores") { main.innerHTML = soon("", "", "هيتم تفعيل المحلات المتعاقدة هنا لاحقًا."); return; }
     if (S.mgmtTab === "staff") { main.innerHTML = soon("", "", "هيتم تفعيل تعيين الموظفين هنا لاحقًا."); return; }
     if (S.mgmtTab === "customers") { renderCustomersPage(); return; }
-    main.innerHTML = '<div class="tab-pane on tab-anim"><div class="tab-head"><h2><i class="fa-solid fa-motorcycle" style="margin-left:6px;color:var(--accent);"></i>الطيارين</h2></div>' + subBtns(PIL_SUBS, S.mgmtSub, "mgmtSub") +
+    main.innerHTML = '<div class="tab-pane on"><div class="tab-head"><h2><i class="fa-solid fa-motorcycle" style="margin-left:6px;color:var(--accent);"></i>الطيارين</h2></div>' + subBtns(PIL_SUBS, S.mgmtSub, "mgmtSub") +
       '<div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" class="search-input" id="mgmtSearch" placeholder="ابحث بالاسم أو رقم الهاتف..." value="' + esc(S.search) + '"></div><div id="mgmtListSlot">' + loader + "</div></div>";
     renderMgmtList(); if (!S.pilots) fetchPilots();
   }
@@ -290,7 +296,7 @@
   /* ---------- العملاء ---------- */
   function custBad(c) { return /موقوف|محظور|حظر/.test(c.status || "") || /حذف/.test(c.prog || ""); }
   function renderCustomersPage() {
-    $("mainContent").innerHTML = '<div class="tab-pane on tab-anim"><div class="tab-head"><h2><i class="fa-solid fa-users" style="margin-left:6px;color:var(--accent);"></i>العملاء</h2><div class="tab-badge" id="custBadge">0</div></div>' + subBtns(CUST_SUBS, S.custSub, "custSub") +
+    $("mainContent").innerHTML = '<div class="tab-pane on"><div class="tab-head"><h2><i class="fa-solid fa-users" style="margin-left:6px;color:var(--accent);"></i>العملاء</h2><div class="tab-badge" id="custBadge">0</div></div>' + subBtns(CUST_SUBS, S.custSub, "custSub") +
       '<div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" class="search-input" id="custSearch" placeholder="ابحث بالاسم أو رقم الهاتف..." value="' + esc(S.custSearch) + '"></div><div id="custListSlot">' + loader + "</div></div>";
     renderCustList(); if (!S.custs) fetchCustomers();
   }
@@ -340,7 +346,7 @@
     $("modalBox").innerHTML = '<div class="modal-bar"></div><div class="cfm-icon dan"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="cfm-txt">' + esc(text) + '</div><div class="modal-btns"><button class="act-btn dan" style="flex:1;" data-act="confirmYes">تأكيد</button><button class="act-btn sec" style="flex:1;" data-act="confirmNo">إلغاء</button></div>';
     $("modalBg").classList.add("show");
   }
-  function closeModal() { $("modalBox").classList.remove("tall"); $("modalBg").classList.remove("show"); S.pickBon = null; S.pickSel = null; }
+  function closeModal() { $("modalBox").classList.remove("tall"); $("modalBg").classList.remove("show"); S.pickBon = null; S.pickSel = null; if (S.lc) { clearTimeout(S.lc.timer); S.lc = null; } }
 
   /* ---------- الفاتورة ---------- */
   function parseLines(txt) {
@@ -361,7 +367,8 @@
     rows += '<tr class="ship"><td class="inv-n">التوصيل</td><td>—</td><td>—</td><td><b>' + num(o.fee) + "</b></td></tr>";
     return '<div class="inv-sub"><span>فاتورة الطلب رقم ' + o.bon + "</span>" + (o.dateTxt ? "<span>" + esc((o.day ? o.day + " " : "") + o.dateTxt) + "</span>" : "") + (o.timeTxt ? "<span>" + esc(o.timeTxt) + "</span>" : "") + "</div>" +
       '<table class="inv-t"><thead><tr><th class="inv-n">اسم الصنف</th><th>سعر القطعة</th><th>العدد</th><th>الإجمالي</th></tr></thead><tbody>' + rows +
-      '</tbody><tfoot><tr><td colspan="4"><div class="inv-f"><span>الإجمالي النهائي</span><b>' + num(invTotal(o)) + " ج.م</b></div></td></tr></tfoot></table>";
+      '</tbody><tfoot><tr><td colspan="4"><div class="inv-f"><span>الإجمالي النهائي</span><b>' + num(invTotal(o)) + " ج.م</b></div></td></tr>" +
+      (o.note ? '<tr><td colspan="4"><div class="inv-note"><span>ملحوظة العميل :</span><p>' + esc(o.note) + "</p></div></td></tr>" : "") + "</tfoot></table>";
   }
   function invBlock(o) {
     var on = !!S.inv[o.bon];
@@ -383,14 +390,15 @@
     });
   }
   setInterval(tickClocks, 15000);
-  function etaStrip(o) {
+  function etaInfo(o) {
     if (o.stage === "delivering") {
-      if (o.arrived || /وصل/.test(o.custEta)) return '<div class="etab ok"><i class="fa-solid fa-location-dot"></i> المندوب وصل لموقع العميل ✅</div>';
-      return '<div class="etab"><i class="fa-solid fa-clock"></i> فاضل على وصول المندوب للعميل: ' + (o.custEta ? esc(o.custEta) : "جاري الحساب…") + "</div>";
+      if (o.arrived || /وصل/.test(o.custEta)) return { ok: true, icon: "fa-location-dot", text: "المندوب وصل لموقع العميل ✅" };
+      return { ok: false, icon: "fa-clock", text: "فاضل على وصول المندوب للعميل: " + (o.custEta ? o.custEta : "جاري الحساب…") };
     }
-    if (o.stage === "accepted" && o.shopEta) return /وصل/.test(o.shopEta) ? '<div class="etab ok"><i class="fa-solid fa-store"></i> المندوب وصل الصيدلية ✅</div>' : '<div class="etab"><i class="fa-solid fa-store"></i> وصول المندوب للصيدلية خلال: ' + esc(o.shopEta) + "</div>";
-    return "";
+    if (o.stage === "accepted" && o.shopEta) return /وصل/.test(o.shopEta) ? { ok: true, icon: "fa-store", text: "المندوب وصل الصيدلية ✅" } : { ok: false, icon: "fa-store", text: "وصول المندوب للصيدلية خلال: " + o.shopEta };
+    return null;
   }
+  function etaStrip(o) { var e = etaInfo(o); return e ? '<div class="etab' + (e.ok ? " ok" : "") + '"><i class="fa-solid ' + e.icon + '"></i> ' + esc(e.text) + "</div>" : ""; }
   // العنوان: السطر الأول لحد أول "علامة بداية جديدة" (عزبة/شارع/عمارة/فاصلة...) والباقي في السطر اللي تحته
   var ADDR_BRK = /\s*[-–—،,\/]\s+|\s(?=(?:عزبة|قرية|كفر|نجع|شارع|ش\d|ش\s|عمارة|برج|حارة|دور|الدور|شقة|منزل|بيت)(?:\s|\d|$))/g;
   function addrLines(o) {
@@ -410,9 +418,9 @@
     return '<div class="ic-sec"><div class="ic-row"><div class="ic-txt"><div class="ic-lbl">اسم العميل :</div><div class="ic-name">' + esc(o.name || "—") + "</div></div>" + btns + "</div>" +
       '<div class="ic-row ic-adr"><div class="ic-txt"><div class="ic-lbl">العنوان :</div><div class="ic-addr">' + (lines.length ? lines.map(esc).join("<br>") : "—") + "</div>" + (o.landmark ? "<small>علامة مميزة : " + esc(o.landmark) + "</small>" : "") + "</div>" + map + "</div></div>";
   }
-  function pilotBox(o) {
+  function pilotBox(o, label) {
     var L = splitLabel(o.pilotName), p = pilotBy(o.pilotPhone), veh = L.veh || (p && p.vehicle) || "—";
-    return '<div class="pbox"><div class="ptxt"><div><span class="pl">الطيار :</span><b>' + esc(L.name || "—") + '</b></div><div><span class="pl">المركبة :</span><b>' + esc(veh) + "</b></div></div>" +
+    return '<div class="pbox"><div class="ptxt"><div><span class="pl">' + (label || "الطيار الحالي :") + '</span><b>' + esc(L.name || "—") + '</b></div><div><span class="pl">المركبة :</span><b>' + esc(veh) + "</b></div></div>" +
       (o.pilotPhone ? '<a class="ib call" href="tel:' + esc(o.pilotPhone) + '" aria-label="اتصال بالطيار"><i class="fa-solid fa-phone"></i></a>' : "") + "</div>";
   }
   function prevRows(o) {
@@ -424,8 +432,11 @@
     });
     return r;
   }
+  function pilotsSection(o, label) { return '<div class="sec-ttl">الطيارين المستلمين :</div>' + (o.pilotName ? pilotBox(o, label) : "") + prevRows(o); }
   function tcardHTML(o) {
-    return '<div class="tcard tc3"><div><small>اليوم</small><b>' + esc(o.day || "—") + (o.dateTxt ? " <span>(" + esc(o.dateTxt) + ")</span>" : "") + '</b></div><div><small>الساعة</small><b>' + esc(o.timeTxt || "—") + "</b></div><div><small>التأخير</small>" + miniClock(o) + "</div></div>";
+    var e = etaInfo(o);
+    return '<div class="tcard"><div><small>اليوم</small><b>' + esc(o.day || "—") + (o.dateTxt ? " <span>(" + esc(o.dateTxt) + ")</span>" : "") + '</b></div><div><small>الساعة</small><b>' + esc(o.timeTxt || "—") + "</b></div><div><small>التأخير</small>" + miniClock(o) + "</div>" +
+      (e ? '<div class="tc-eta' + (e.ok ? " ok" : "") + '"><i class="fa-solid ' + e.icon + '"></i><span>' + esc(e.text) + "</span></div>" : "") + "</div>";
   }
   function ordCard(o) {
     var open = S.open === o.bon, tag = '<span class="mtag ' + o.stage + '">' + STAGE_TAG[o.stage] + "</span>";
@@ -434,10 +445,10 @@
     var head = open ? '<div class="ahead"><span class="bon">#' + o.bon + "</span>" + '<span class="amid">' + miniClock(o) + '</span><span class="aside">' + tag + arw + "</span></div>"
       : '<button class="ahead" data-act="ocOpen" data-bon="' + o.bon + '"><span class="bon">#' + o.bon + "</span>" + area + '<span class="aside">' + tag + arw + "</span></button>";
     var h = '<div class="ac' + (open ? " open" : "") + '" id="o' + o.bon + '">' + head + '<div class="glowln"></div>';
-    if (!open) return h + tcardHTML(o) + etaStrip(o) + "</div>";
-    h += '<div class="abody">' + custBlock(o) + etaStrip(o) + invBlock(o) + (o.note ? '<div class="onote">ملحوظة: ' + esc(o.note) + "</div>" : "");
+    if (!open) return h + tcardHTML(o) + "</div>";
+    h += '<div class="abody">' + custBlock(o) + etaStrip(o) + invBlock(o);
     if (o.stage === "new") h += '<div class="arow"><button class="act-btn dan" data-act="cancelOrder" data-bon="' + o.bon + '"><i class="fa-solid fa-ban"></i> إلغاء الطلب</button></div>';
-    else h += pilotBox(o) + prevRows(o) + '<div class="arow"><button class="act-btn sec" data-act="pickOpen" data-bon="' + o.bon + '"><i class="fa-solid fa-right-left"></i> تحويل لطيار آخر</button><button class="act-btn dan" data-act="cancelOrder" data-bon="' + o.bon + '"><i class="fa-solid fa-ban"></i> إلغاء الطلب</button></div>';
+    else h += pilotsSection(o) + '<div class="arow three"><button class="act-btn sec" data-act="pickOpen" data-bon="' + o.bon + '"><i class="fa-solid fa-right-left"></i><span>تحويل لطيار آخر</span></button><button class="act-btn sec loc" data-act="lcOpen" data-bon="' + o.bon + '"><i class="fa-solid fa-location-crosshairs"></i><span>تعديل اللوكيشن</span></button><button class="act-btn dan" data-act="cancelOrder" data-bon="' + o.bon + '"><i class="fa-solid fa-ban"></i><span>إلغاء الطلب</span></button></div>';
     return h + "</div></div>";
   }
   function delCard(o) {
@@ -445,19 +456,22 @@
     var arw = open ? '<button class="arw" data-act="ocClose"><i class="fa-solid fa-chevron-down"></i></button>' : '<span class="arw"><i class="fa-solid fa-chevron-down"></i></span>';
     var inner = '<span class="bon">#' + o.bon + '</span><span class="amid"><span class="tag ap"><i class="fa-solid fa-location-dot"></i>' + esc(o.area || "—") + '</span></span><span class="aside">' + tag + arw + "</span>";
     var h = '<div class="ac' + (open ? " open" : "") + '" id="o' + o.bon + '">' + (open ? '<div class="ahead">' + inner + "</div>" : '<button class="ahead" data-act="ocOpen" data-bon="' + o.bon + '">' + inner + "</button>") + '<div class="glowln"></div>';
-    if (!open) return h + '<div class="tcard tc3"><div><small>يوم التسليم</small><b>' + esc(o.doneDay || "—") + (o.doneDateTxt ? " <span>(" + esc(o.doneDateTxt) + ")</span>" : "") + '</b></div><div><small>الساعة</small><b>' + esc(o.doneTimeTxt || "—") + '</b></div><div><small>الإجمالي</small><b dir="ltr">' + num(invTotal(o)) + " ج.م</b></div></div></div>";
-    var cell = function (l, v) { return "<div><small>" + l + "</small><b>" + v + "</b></div>"; };
-    h += '<div class="abody"><div class="itab">' + cell("وقت الطلب", esc(o.timeTxt || "—")) + cell("وقت التسليم", esc(o.doneTimeTxt || "—")) + cell("مدة التوصيل", esc(fmtDur(o.durMin))) + cell("رسوم التوصيل", num(o.fee) + " ج") + cell("إجمالي الفاتورة", num(invTotal(o)) + " ج") + cell("تاريخ الطلب", esc(o.dateTxt || "—")) + "</div>" +
-      custBlock(o) + invBlock(o) + (o.note ? '<div class="onote">ملحوظة: ' + esc(o.note) + "</div>" : "") + (o.pilotName ? pilotBox(o) : "") + prevRows(o) + "</div></div>";
+    if (!open) return h + '<div class="tcard"><div><small>يوم التسليم</small><b>' + esc(o.doneDay || "—") + (o.doneDateTxt ? " <span>(" + esc(o.doneDateTxt) + ")</span>" : "") + '</b></div><div><small>الساعة</small><b>' + esc(o.doneTimeTxt || "—") + '</b></div><div><small>الإجمالي</small><b dir="ltr">' + num(invTotal(o)) + " ج.م</b></div></div></div>";
+    var cell = function (cls, l, v) { return '<div class="dc ' + cls + '"><small>' + l + "</small><b>" + v + "</b></div>"; };
+    var goods = Math.max(0, invTotal(o) - (Number(o.fee) || 0));
+    h += '<div class="abody"><div class="dgrid">' +
+      cell("blue c3", "تاريخ الطلب", esc(o.dateTxt || "—")) + cell("blue c3", "وقت الطلب", esc(o.timeTxt || "—")) +
+      cell("yel c2", "وقت القبول", esc(o.accTxt || "—")) + cell("yel c2", "مدة التسليم", esc(o.delivDurMin >= 0 ? fmtDur(o.delivDurMin) : "—")) + cell("yel c2", "وقت التوصيل", esc(o.doneTimeTxt || "—")) +
+      cell("neu c3", "سعر الطلب", num(goods) + " ج") + cell("grn c3", "خدمة التوصيل", num(o.fee) + " ج") + "</div>" +
+      custBlock(o) + invBlock(o) + pilotsSection(o, "الطيار المسلّم :") + "</div></div>";
     return h;
   }
 
   /* ---------- متابعة الطيارين ---------- */
-  var TP_TABS = [["working", "يعمل الان"], ["off", "لا يعمل"], "|", ["new", "الطلبات الجديدة"], ["accepted", "مقبولة"], ["preparing", "تجهيز"], ["delivering", "توصيل"], "|", ["delivered", "تم التسليم"]];
-  var TP_TITLES = { working: "الطيارين - يعمل الان", off: "الطيارين - لا يعمل", "new": "الطلبات الجديدة", accepted: "الطلبات المقبولة", preparing: "قيد التحضير", delivering: "قيد التوصيل", delivered: "تم التسليم" };
+  var TP_TABS = [["working", "يعمل الان"], ["off", "لا يعمل"], "|", ["new", "الطلبات الجديدة"], ["accepted", "الطلبات المقبولة"], ["preparing", "جاري التحضير"], ["delivering", "جاري التوصيل"], "|", ["delivered", "طلبات تم توصيلها"]];
+  var TP_TITLES = { working: "الطيارين - يعمل الان", off: "الطيارين - لا يعمل", "new": "الطلبات الجديدة", accepted: "الطلبات المقبولة", preparing: "جاري التحضير", delivering: "جاري التوصيل", delivered: "طلبات تم توصيلها" };
   function renderTrackPilots() {
-    var sub = $("subNav"); sub.style.display = "flex"; $("mainContent").className = "main with-sub";
-    sub.innerHTML = chips(TP_TABS, S.tpTab, "tpTab");
+    ensureSubNav("tp", TP_TABS, "tpTab", S.tpTab);
     $("mainContent").innerHTML = '<div class="tab-pane on"><div id="tpBody">' + loader + "</div></div>";
     renderTpBody(); fetchPilots(); fetchActive(); if (S.tpTab === "delivered") fetchDelivered();
   }
@@ -479,12 +493,14 @@
     } else if (t === "delivered") {
       if (!S.delivered) { el.innerHTML = loader; return; }
       h = head(S.delivered.length); if (!S.delivered.length) h += '<div class="empty"><i class="fa-solid fa-inbox"></i><h3>لا توجد طلبات هنا</h3></div>';
-      S.delivered.forEach(function (o) { h += delCard(o); });
+      if (S.open !== null && !S.delivered.some(function (o) { return o.bon === S.open; })) S.open = null;
+      S.delivered.forEach(function (o) { if (S.open === null || S.open === o.bon) h += delCard(o); });
     } else {
       if (!S.orders) { el.innerHTML = loader; return; }
       var ol = S.orders.filter(function (o) { return o.stage === t; }); h = head(ol.length);
       if (!ol.length) h += '<div class="empty"><i class="fa-solid fa-inbox"></i><h3>لا توجد طلبات هنا</h3></div>';
-      ol.forEach(function (o) { h += ordCard(o); });
+      if (S.open !== null && !ol.some(function (o) { return o.bon === S.open; })) S.open = null;
+      ol.forEach(function (o) { if (S.open === null || S.open === o.bon) h += ordCard(o); });
     }
     el.innerHTML = h; window.scrollTo(0, y);
   }
@@ -563,12 +579,104 @@
     });
   }
 
+  /* ---------- تعديل اللوكيشن (محل / عميل) ---------- */
+  // نفس صيغ اللوكيشن اللي بيفهمها سكربت الطلبات: لينكات جوجل/Apple/Waze، geo:، إحداثيات (عربي/إنجليزي)، درجات-دقايق-ثواني، Plus Code
+  var OLC = "23456789CFGHJMPQRVWX", STORE_COORDS = { lat: 30.121208, lng: 31.2491106 };
+  var inEgypt = function (la, lo) { return isFinite(la) && isFinite(lo) && la >= 21 && la <= 33 && lo >= 24 && lo <= 37.5; };
+  function olcEncode(lat, lng) {
+    lat = Math.min(Math.max(lat, -90), 90) + 90; lng = ((lng + 180) % 360 + 360) % 360;
+    var res = [20, 1, 0.05, 0.0025, 0.000125], out = "";
+    for (var i = 0; i < 5; i++) { var a = Math.floor(lat / res[i]), b = Math.floor(lng / res[i]); lat -= a * res[i]; lng -= b * res[i]; out += OLC.charAt(a) + OLC.charAt(b); }
+    return out.slice(0, 8) + "+" + out.slice(8);
+  }
+  function olcDecode(code, ref) {
+    code = String(code).toUpperCase().replace(/\s+/g, ""); var p = code.indexOf("+"); if (p < 0) return null;
+    var full = code; if (p < 8) { if (!ref) return null; full = olcEncode(ref.lat, ref.lng).slice(0, 8 - p) + code; }
+    var d = full.replace("+", ""), res = [20, 1, 0.05, 0.0025, 0.000125], lat = -90, lng = -180, last = 0;
+    for (var i = 0; i < Math.min(d.length, 10) / 2; i++) { var a = OLC.indexOf(d.charAt(2 * i)), b = OLC.indexOf(d.charAt(2 * i + 1)); if (a < 0 || b < 0) return null; lat += a * res[i]; lng += b * res[i]; last = res[i]; }
+    return { lat: lat + last / 2, lng: lng + last / 2 };
+  }
+  function parseCoords(t) {
+    t = String(t || "").replace(/[٠-٩]/g, function (x) { return "٠١٢٣٤٥٦٧٨٩".indexOf(x); }).replace(/[۰-۹]/g, function (x) { return "۰۱۲۳۴۵۶۷۸۹".indexOf(x); }).replace(/٫/g, ".").replace(/،/g, ",");
+    var vs = [t]; try { var d = decodeURIComponent(t); if (d !== t) vs.push(d); } catch (e) {}
+    var ok = function (la, ln) { la = +la; ln = +ln; return inEgypt(la, ln) ? { lat: la, lng: ln } : null; };
+    var pats = [
+      /!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/,
+      /[?&#](?:q|ll|query|destination|daddr|saddr|sll|center|coordinate|coord|latlng|dest|to)=(?:loc:|geo:)?\s*(-?\d{1,3}\.\d+)\s*[,;]\s*(-?\d{1,3}\.\d+)/i,
+      /[?&](?:lat|latitude)=(-?\d{1,3}\.\d+)&(?:lng|lon|long|longitude)=(-?\d{1,3}\.\d+)/i,
+      /geo:(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)/,
+      /\/(?:place|search|dir|maps|ll)\/(?:[^\/@?]*\/)?(-?\d{1,3}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/,
+      /@(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)/,
+      /^\s*(-?\d{1,3}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})\s*$/,
+      /(?:^|[^\d.])(-?\d{1,3}\.\d{4,})\s*°?\s*N?\s*[,;\s]\s*(-?\d{1,3}\.\d{4,})\s*°?\s*E?(?![\d.])/i
+    ];
+    for (var v = 0; v < vs.length; v++) {
+      for (var i = 0; i < pats.length; i++) { var m = vs[v].match(pats[i]); var r = m && ok(m[1], m[2]); if (r) return r; }
+      var m2 = vs[v].match(/!1d(-?\d{1,3}\.\d+)!2d(-?\d{1,3}\.\d+)/); var r2 = m2 && ok(m2[2], m2[1]); if (r2) return r2;
+      var dm = vs[v].match(/(\d{1,2})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:"|″|'')?\s*([NS])?[\s,;]*(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:"|″|'')?\s*([EW])?/i);
+      if (dm) { var la = +dm[1] + dm[2] / 60 + dm[3] / 3600, ln = +dm[5] + dm[6] / 60 + dm[7] / 3600; if (/s/i.test(dm[4] || "")) la = -la; if (/w/i.test(dm[8] || "")) ln = -ln; var r3 = ok(la, ln); if (r3) return r3; }
+      var pc = vs[v].match(/(?:^|[\s(,:])((?:[23456789CFGHJMPQRVWX]{2,8})\+[23456789CFGHJMPQRVWX]{2,3})(?=$|[\s,)])/i);
+      if (pc) { var o = olcDecode(pc[1], STORE_COORDS); var r4 = o && ok(o.lat, o.lng); if (r4) return r4; }
+    }
+    return null;
+  }
+  var MAPS_URL_RE = /(?:maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs|g\.page|share\.google|google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.apple\.com|waze\.com)/i;
+  function locCheck(raw) {
+    var s = String(raw || "").trim(); if (!s) return { state: "empty" };
+    var u = s.match(/https?:\/\/[^\s]+/i), url = u ? u[0].replace(/[)\].,،;]+$/, "") : "";
+    var c = parseCoords(url || s);
+    if (c) return { state: "ok", lat: c.lat, lng: c.lng, link: "https://www.google.com/maps?q=" + c.lat + "," + c.lng };
+    if (url && MAPS_URL_RE.test(url)) return { state: "resolve", url: url };
+    return { state: "bad" };
+  }
+  function lcOpen(bon) {
+    var o = orderBy(bon); if (!o) return;
+    S.lc = { bon: bon, which: null, val: "", ok: false, link: "", seq: 0, timer: null };
+    $("modalBox").classList.remove("tall");
+    $("modalBox").innerHTML = '<div class="modal-bar"></div><button class="pk-x" data-act="closeModal" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>' +
+      '<div class="modal-ttl">تعديل اللوكيشن</div><div class="pk-sub">طلب #' + o.bon + " — " + esc(o.name || "") + "</div>" +
+      '<div class="lc-pick"><button class="lc-b shop" data-act="lcPick" data-w="shop"><i class="fa-solid fa-store"></i><span>تغيير لوكيشن المحل</span></button><button class="lc-b cust" data-act="lcPick" data-w="cust"><i class="fa-solid fa-house-user"></i><span>تغيير لوكيشن العميل</span></button></div>' +
+      '<div class="lc-sec" id="lcForm"><div class="lc-in"><div class="lc-cur" id="lcCur"></div><textarea id="lcInput" rows="2" dir="ltr" placeholder="" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea><div class="lc-hint" id="lcHint"></div></div></div>' +
+      '<div class="lc-sec" id="lcConf"><div class="lc-in"><button class="act-btn lc-ok" id="lcOk" data-act="lcConfirm"><i class="fa-solid fa-check"></i> <span id="lcOkTxt"></span></button></div></div>';
+    $("modalBg").classList.add("show");
+  }
+  var LC_TXT = { shop: "المحل", cust: "العميل" };
+  function lcPick(w) {
+    var L = S.lc; if (!L) return; L.which = w;
+    document.querySelectorAll(".lc-b").forEach(function (b) { b.classList.toggle("on", b.dataset.w === w); b.classList.toggle("dim", b.dataset.w !== w); });
+    var o = orderBy(L.bon), cur = o ? (w === "shop" ? o.sloc : o.cloc) : "", url = mapsUrl(cur) || (w === "shop" ? "https://www.google.com/maps?q=" + STORE_COORDS.lat + "," + STORE_COORDS.lng : "");
+    $("lcCur").innerHTML = url ? 'اللوكيشن الحالي لـ' + LC_TXT[w] + ': <a href="' + esc(url) + '" target="_blank" rel="noopener">افتح على الخريطة</a>' : "لا يوجد لوكيشن حالي لـ" + LC_TXT[w];
+    var inp = $("lcInput"); inp.placeholder = "قم بإضافة لوكيشن " + LC_TXT[w] + " الجديد"; $("lcOkTxt").textContent = "تأكيد لوكيشن " + LC_TXT[w] + " الجديد";
+    $("lcOk").className = "act-btn lc-ok " + w; $("lcForm").classList.add("on"); lcValidate(); setTimeout(function () { try { inp.focus(); } catch (e) {} }, 350);
+  }
+  function lcValidate() {
+    var L = S.lc; if (!L) return; var r = locCheck(L.val), hint = $("lcHint"); L.ok = false; L.link = ""; clearTimeout(L.timer); L.seq++;
+    var done = function (ok, cls, html) { L.ok = ok; hint.className = "lc-hint " + cls; hint.innerHTML = html; $("lcConf").classList.toggle("on", ok); };
+    if (r.state === "empty") return done(false, "", "");
+    if (r.state === "bad") return done(false, "bad", '<i class="fa-solid fa-circle-xmark"></i> لوكيشن غير مفهوم — ألصق لينك خرائط، أو إحداثيات، أو Plus Code');
+    if (r.state === "ok") { L.link = r.link; return done(true, "ok", '<i class="fa-solid fa-circle-check"></i> لوكيشن صحيح (<bdi dir="ltr">' + r.lat.toFixed(6) + " , " + r.lng.toFixed(6) + "</bdi>)"); }
+    done(false, "wait", '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق من اللينك…');
+    var seq = L.seq; L.timer = setTimeout(function () {
+      api("resolveLocation", { loc: r.url }).then(function (d) {
+        if (!S.lc || S.lc !== L || seq !== L.seq) return;
+        if (d && d.status === "success") { L.link = d.link; done(true, "ok", '<i class="fa-solid fa-circle-check"></i> لوكيشن صحيح (' + Number(d.lat).toFixed(6) + " , " + Number(d.lng).toFixed(6) + ")"); }
+        else done(false, "bad", '<i class="fa-solid fa-circle-xmark"></i> ' + esc((d && d.message) || "مقدرناش نفهم اللوكيشن ده"));
+      }).catch(function () { if (S.lc === L && seq === L.seq) done(false, "bad", '<i class="fa-solid fa-circle-xmark"></i> تعذر التحقق (النت؟) — جرّب تاني'); });
+    }, 450);
+  }
+  function lcConfirm() {
+    var L = S.lc; if (!L || !L.ok || !L.which) return; var o = orderBy(L.bon); if (!o) { closeModal(); return; }
+    var w = L.which, link = L.link; if (w === "shop") o.sloc = link; else o.cloc = link;
+    o.shopEta = ""; o.custEta = ""; o.arrived = false;
+    closeModal(); toast("تم تغيير لوكيشن " + LC_TXT[w] + " — جاري إعادة حساب التوصيل", "ok"); rerender();
+    enqueue("updateOrderLocation", { bon: o.bon, which: w, loc: link }, "تعذر تغيير لوكيشن " + LC_TXT[w]);
+  }
+
   /* ---------- متابعة الموظفين / المتعاقدين (قريبًا) ---------- */
   var MS_TABS = [["order", "دعم الطلبات"], ["personal", "دعم شخصي"], ["customers", "دعم العملاء"], ["contractors", "دعم المتعاقدين"]];
   var MS_TITLES = { order: "دعم الطلبات", personal: "دعم شخصي", customers: "دعم العملاء", contractors: "دعم المتعاقدين" };
   function renderMonitorStaff() {
-    var sub = $("subNav"); sub.style.display = "flex"; $("mainContent").className = "main with-sub";
-    sub.innerHTML = chips(MS_TABS, S.msTab, "msTab");
+    ensureSubNav("ms", MS_TABS, "msTab", S.msTab);
     $("mainContent").innerHTML = soon(MS_TITLES[S.msTab], "fa-headset", "هيتم تفعيل " + MS_TITLES[S.msTab] + " هنا لاحقًا بعد تجهيز نظام موظفي الدعم.");
   }
   function renderContractors() { $("mainContent").innerHTML = soon("متابعة المتعاقدين", "fa-handshake", "هيتم تفعيل متابعة المتعاقدين هنا لاحقًا مع تصميم قسم المحلات المتعاقدة."); }
@@ -647,13 +755,15 @@
     setInterval(function () { if (!document.hidden) checkStatus(); }, 30000);
   }
 
+  function closeCard() { S.open = null; renderTpBody(); window.scrollTo(0, S.scrollBefore || 0); }
+
   /* ---------- زرار الرجوع (أندرويد) ---------- */
   function goBack() {
     if ($("modalBg").classList.contains("show")) return closeModal();
     if (drawerOpen()) return closeDrawer();
     if (S.selected) return closeDetail();
     if (S.viewPilot) { S.viewPilot = null; return renderTpBody(); }
-    if (S.open !== null) { S.open = null; return renderTpBody(); }
+    if (S.open !== null) return closeCard();
     if (S.page !== "management") return openPage("management");
     confirmBox("هل تريد الخروج من التطبيق؟", function () { try { window.Capacitor.Plugins.App.exitApp(); } catch (e) {} });
   }
@@ -669,9 +779,9 @@
     modalBg: function (el, e) { if (e.target === el) closeModal(); }, closeModal: closeModal,
     confirmYes: function () { var f = S.cfmYes; S.cfmYes = null; S.cfmNo = null; $("modalBg").classList.remove("show"); $("modalBox").classList.remove("tall"); if (f) f(); },
     confirmNo: function () { var f = S.cfmNo; S.cfmYes = null; S.cfmNo = null; if (f) f(); else closeModal(); },
-    mgmtTab: function (el) { S.mgmtTab = el.dataset.v; S.mgmtSub = "pending"; S.custSub = "ok"; S.selected = null; S.search = ""; S.custSearch = ""; renderManagement(); },
-    mgmtSub: function (el) { S.mgmtSub = el.dataset.v; renderManagement(); },
-    custSub: function (el) { S.custSub = el.dataset.v; renderManagement(); },
+    mgmtTab: function (el) { S.mgmtTab = el.dataset.v; S.mgmtSub = "pending"; S.custSub = "ok"; S.selected = null; S.search = ""; S.custSearch = ""; renderManagement(); window.scrollTo(0, 0); },
+    mgmtSub: function (el) { S.mgmtSub = el.dataset.v; setSubBtn("mgmtSub", S.mgmtSub); renderMgmtList(); },
+    custSub: function (el) { S.custSub = el.dataset.v; setSubBtn("custSub", S.custSub); renderCustList(); },
     openPilot: function (el) { openPilot(el.dataset.id); }, closeDetail: closeDetail,
     draftReq: function (el) { S.draftReq = el.dataset.v; renderPage(); }, draftPerson: function (el) { S.draftPerson = el.dataset.v; renderPage(); },
     saveStatus: saveStatus, saveInfo: saveInfo,
@@ -679,16 +789,20 @@
     editOk: function (el) { S.editing[el.dataset.k] = false; renderPage(); },
     editNo: function (el) { S.drafts[el.dataset.k] = S.orig[el.dataset.k]; S.editing[el.dataset.k] = false; renderPage(); },
     openCust: function (el) { openCust(el.dataset.id); }, custSet: custSet,
-    tpTab: function (el) { S.tpTab = el.dataset.v; S.open = null; S.viewPilot = null; renderTrackPilots(); },
+    tpTab: function (el) {
+      S.tpTab = el.dataset.v; S.open = null; S.viewPilot = null; setChipOn("tpTab", S.tpTab); renderTpBody(); window.scrollTo(0, 0);
+      if (S.tpTab === "delivered") fetchDelivered(); else if (S.tpTab !== "working" && S.tpTab !== "off") fetchActive(); else { fetchPilots(); fetchActive(); }
+    },
     viewPilot: function (el) { S.viewPilot = el.dataset.id; S.pwShown = false; renderTpBody(); window.scrollTo(0, 0); },
     pvBack: function () { S.viewPilot = null; renderTpBody(); }, pvPw: function () { S.pwShown = !S.pwShown; renderTpBody(); },
-    ocOpen: function (el) { S.open = Number(el.dataset.bon); renderTpBody(); var c = $("o" + S.open); if (c) c.scrollIntoView({ block: "nearest" }); },
-    ocClose: function () { S.open = null; renderTpBody(); },
+    ocOpen: function (el) { S.scrollBefore = window.scrollY; S.open = Number(el.dataset.bon); renderTpBody(); window.scrollTo(0, 0); },
+    ocClose: closeCard,
     invToggle: function (el) { var b = Number(el.dataset.bon); S.inv[b] = !S.inv[b]; el.closest(".inv").classList.toggle("open", !!S.inv[b]); el.querySelector(".inv-title").textContent = S.inv[b] ? "صيدلية عوف" : "افتح الفاتورة"; },
     pickOpen: function (el) { pickOpen(Number(el.dataset.bon)); },
     pickType: function (el) { S.pickType = el.dataset.v; S.pickSel = null; renderPicker(); },
     pickSel: function (el) { S.pickSel = el.dataset.id; renderPicker(); },
     pickConfirm: pickConfirm, pickWithdraw: pickWithdraw,
+    lcOpen: function (el) { lcOpen(Number(el.dataset.bon)); }, lcPick: function (el) { lcPick(el.dataset.w); }, lcConfirm: lcConfirm,
     cancelOrder: function (el) { cancelOrder(Number(el.dataset.bon)); },
     msTab: function (el) { S.msTab = el.dataset.v; renderMonitorStaff(); }
   };
@@ -701,6 +815,7 @@
     if (t.dataset && t.dataset.model) S.drafts[t.dataset.model] = t.value;
     else if (t.id === "mgmtSearch") { S.search = t.value; renderMgmtList(); }
     else if (t.id === "custSearch") { S.custSearch = t.value; renderCustList(); }
+    else if (t.id === "lcInput") { if (S.lc) { S.lc.val = t.value; lcValidate(); } }
     else if (t.id === "regBirthDate") calcAge();
   });
   document.addEventListener("change", function (e) { if (e.target.id === "regBirthDate") calcAge(); if (e.target.dataset && e.target.dataset.model) S.drafts[e.target.dataset.model] = e.target.value; });
