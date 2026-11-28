@@ -1,3 +1,29 @@
+/* ===== حماية الواجهة: منع الكليك يمين / الضغط المطوّل / النسخ / F12 / فحص الصفحة (ردع للمستخدم العادي) ===== */
+(function () {
+  var isField = function (t) { return !!(t && t.closest && t.closest("input,textarea")); };
+  var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  var block = function (e) { e.preventDefault(); e.stopPropagation(); return false; };
+  ["contextmenu", "dragstart", "copy", "cut", "dblclick"].forEach(function (ev) { document.addEventListener(ev, function (e) { if (ev === "dblclick" && isField(e.target)) return; return block(e); }, true); });
+  document.addEventListener("selectstart", function (e) { if (!isField(e.target)) e.preventDefault(); }, true);
+  document.addEventListener("keydown", function (e) {
+    var k = String(e.key || "").toLowerCase(), c = e.ctrlKey || e.metaKey;
+    if (e.keyCode === 123 || (c && e.shiftKey && "ijckmen".indexOf(k) > -1 && k.length === 1) || (c && (k === "u" || k === "s" || k === "p" || k === "o")) || (c && k === "a" && !isField(e.target))) return block(e);
+  }, true);
+  try { ["log", "info", "debug", "warn", "table", "dir", "trace"].forEach(function (m) { console[m] = function () {}; }); } catch (e) {}
+  if (native) return;
+  // الديسكتوب: لو شغّلوا أدوات المطوّر نغطي الشاشة (وبترجع لوحدها لما تتقفل)
+  var cover = null;
+  var setCover = function (on) {
+    if (on && !cover) { cover = document.createElement("div"); cover.id = "lockScr"; cover.innerHTML = "<div>⛔<br>غير مسموح بفحص الصفحة</div>"; document.body.appendChild(cover); }
+    else if (!on && cover) { cover.remove(); cover = null; }
+  };
+  setInterval(function () {
+    var open = (window.outerWidth - window.innerWidth > 170) || (window.outerHeight - window.innerHeight > 170);
+    var t = Date.now(); (function () { debugger; })(); if (Date.now() - t > 150) open = true;
+    setCover(open);
+  }, 1200);
+})();
+
 /* إدارة صيدلية عوف — لوحة الإدارة والمراقبة
    - كل التعديلات لحظية في الشاشة، وبتتبعت للسيرفر في الخلفية (طابور). علامة الواي فاي جنب القائمة بتبين الحالة:
      أخضر = كله متزامن | أصفر (شرطتين) = في تعديلات لسه بتتبعت | أصفر كامل = النت ضعيف | أحمر = فاصل. */
@@ -119,7 +145,7 @@
 
   /* ---------- الدخول والتسجيل ---------- */
   function hasSession() { return !!(localStorage.getItem(K_SESSION) && localStorage.getItem(K_TOKEN)); }
-  function forceLogout() { localStorage.removeItem(K_SESSION); localStorage.removeItem(K_DATA); localStorage.removeItem(K_TOKEN); location.reload(); }
+  function forceLogout() { localStorage.removeItem("ouf_admin_ui"); localStorage.removeItem(K_SESSION); localStorage.removeItem(K_DATA); localStorage.removeItem(K_TOKEN); location.reload(); }
   function showSuspended(title, msg) { $("suspTitle").textContent = title; $("suspMsg").textContent = msg || ""; $("suspendedScreen").style.display = "flex"; }
   function show(id, v) { $(id).style.display = v; }
   function doLogin(btn) {
@@ -172,7 +198,7 @@
       '<div class="placeholder-soon"><i class="fa-solid fa-hourglass-half"></i><h2>قريبًا</h2><p>' + text + "</p></div></div>";
   }
   // الشريط العلوي: بيتبني مرة واحدة لكل صفحة، وبعد كده بنبدّل الاختيار بس (من غير ما يرجع لأوله ولا يعمل "ريفريش")
-  function setChipOn(act, v) { document.querySelectorAll('#subNav .sub-chip[data-act="' + act + '"]').forEach(function (c) { c.classList.toggle("on", c.dataset.v === v); }); var on = document.querySelector("#subNav .sub-chip.on"); if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  function setChipOn(act, v) { document.querySelectorAll('#subNav .sub-chip[data-act="' + act + '"]').forEach(function (c) { c.classList.toggle("on", c.dataset.v === v); }); var sub = $("subNav"), on = sub.querySelector(".sub-chip.on"); if (on) { var r = on.getBoundingClientRect(), sr = sub.getBoundingClientRect(); if (r.left < sr.left + 8) sub.scrollLeft += r.left - sr.left - 8; else if (r.right > sr.right - 8) sub.scrollLeft += r.right - sr.right + 8; } }
   function ensureSubNav(kind, items, act, cur) {
     var sub = $("subNav"); sub.style.display = "flex"; $("mainContent").className = "main with-sub";
     if (S.subKind !== kind) { sub.innerHTML = chips(items, cur, act); S.subKind = kind; sub.scrollLeft = 0; } else setChipOn(act, cur);
@@ -327,7 +353,7 @@
       (url ? '<a class="loc-btn" href="' + esc(url) + '" target="_blank" rel="noopener"><i class="fa-solid fa-location-dot"></i> لوكيشن العميل</a>' : "") + "</div>" +
       grp("حالة العميل", CUST_STATUS, c.status, "status") + grp("حالة البرنامج (حذف = إلغاء تثبيت التطبيق من جهاز العميل)", CUST_PROG, c.prog, "prog") +
       '<div class="modal-btns"><button class="act-btn sec" style="flex:1;" data-act="closeModal">إغلاق</button></div>';
-    $("modalBg").classList.add("show");
+    $("modalBg").classList.add("show"); S.custOpen = String(c.phone);
   }
   function custSet(btn) {
     var phone = btn.dataset.phone, kind = btn.dataset.kind, v = btn.dataset.v;
@@ -346,7 +372,7 @@
     $("modalBox").innerHTML = '<div class="modal-bar"></div><div class="cfm-icon dan"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="cfm-txt">' + esc(text) + '</div><div class="modal-btns"><button class="act-btn dan" style="flex:1;" data-act="confirmYes">تأكيد</button><button class="act-btn sec" style="flex:1;" data-act="confirmNo">إلغاء</button></div>';
     $("modalBg").classList.add("show");
   }
-  function closeModal() { $("modalBox").classList.remove("tall"); $("modalBg").classList.remove("show"); S.pickBon = null; S.pickSel = null; if (S.lc) { clearTimeout(S.lc.timer); S.lc = null; } }
+  function closeModal() { $("modalBox").classList.remove("tall"); $("modalBg").classList.remove("show"); S.pickBon = null; S.pickSel = null; S.custOpen = null; if (S.lc) { clearTimeout(S.lc.timer); S.lc = null; } }
 
   /* ---------- الفاتورة ---------- */
   function parseLines(txt) {
@@ -481,7 +507,7 @@
   function renderTpBody() {
     var el = $("tpBody"); if (!el) return;
     var y = window.scrollY, t = S.tpTab, h = "";
-    if (S.viewPilot) { el.innerHTML = pilotView(); window.scrollTo(0, y); return; }
+    if (S.viewPilot) { if (!S.pilots) { el.innerHTML = loader; return; } el.innerHTML = pilotView(); window.scrollTo(0, y); return; }
     var head = function (n) { return '<div class="tab-head"><h2>' + TP_TITLES[t] + '</h2><div class="tab-badge">' + n + "</div></div>"; };
     if (t === "working" || t === "off") {
       if (!S.pilots) { el.innerHTML = loader; return; }
@@ -697,6 +723,43 @@
       '<div class="dp-card" style="padding:20px;text-align:center;"><span style="font-size:14px;font-weight:900;color:var(--accent);">الإصدار v' + esc(CFG.APP_VERSION || "1.0.0") + "</span></div></div>";
   }
 
+  /* ---------- حفظ واسترجاع آخر حالة (لو الأندرويد قفل الصفحة وأنت مش شايفها، ترجع زي ما سبتها) ---------- */
+  var K_UI = "ouf_admin_ui";
+  function saveUI() {
+    if (!S.started) return;
+    try {
+      var dirty = {}; if (S.selected) for (var k in S.drafts) if (S.drafts[k] !== S.orig[k]) dirty[k] = S.drafts[k];
+      localStorage.setItem(K_UI, JSON.stringify({
+        page: S.page, mgmtTab: S.mgmtTab, mgmtSub: S.mgmtSub, custSub: S.custSub, tpTab: S.tpTab, msTab: S.msTab, search: S.search, custSearch: S.custSearch,
+        sel: S.selected ? { phone: S.selected.phone, draftReq: S.draftReq, draftPerson: S.draftPerson, dirty: dirty, editing: S.editing } : null,
+        viewPilot: S.viewPilot, open: S.open, inv: S.inv, custOpen: S.custOpen || null, scroll: Math.round(window.scrollY)
+      }));
+    } catch (e) {}
+  }
+  function loadUI() {
+    var u; try { u = JSON.parse(localStorage.getItem(K_UI)); } catch (e) { u = null; } if (!u) return;
+    ["page", "mgmtTab", "mgmtSub", "custSub", "tpTab", "msTab", "search", "custSearch"].forEach(function (k) { if (u[k] !== undefined && u[k] !== null) S[k] = u[k]; });
+    S.viewPilot = u.viewPilot || null; S.open = u.open == null ? null : u.open; S.inv = u.inv || {};
+    S.rs = { sel: u.sel, custOpen: u.custOpen, scroll: u.scroll };
+  }
+  // بتتنادى كل ما بيانات توصل: بتفتح الطيار/العميل اللي كنت فاتحه، وترجع مكان السكرول
+  function applyRestore() {
+    var r = S.rs; if (!r) return;
+    if (r.sel && S.pilots && S.page === "management" && S.mgmtTab === "pilots") {
+      var sel = r.sel; r.sel = null;
+      if (pilotBy(sel.phone)) {
+        openPilot(sel.phone); S.draftReq = sel.draftReq || S.draftReq; S.draftPerson = sel.draftPerson || S.draftPerson;
+        for (var k in (sel.dirty || {})) S.drafts[k] = sel.dirty[k]; S.editing = sel.editing || {}; renderPage();
+      }
+    }
+    if (r.custOpen && S.custs && S.page === "management" && S.mgmtTab === "customers") { var cp = r.custOpen; r.custOpen = null; if (S.custs.some(function (c) { return String(c.phone) === String(cp); })) openCust(cp); }
+    var ready = S.page === "management" ? (S.mgmtTab === "customers" ? !!S.custs : S.mgmtTab === "pilots" ? !!S.pilots : true) : S.page === "trackPilots" ? !!(S.pilots && (S.tpTab === "delivered" ? S.delivered : S.orders)) : true;
+    if (ready && r.scroll != null && !r.sel && !r.custOpen) { var y = r.scroll; r.scroll = null; setTimeout(function () { window.scrollTo(0, y); }, 60); S.rs = null; }
+  }
+  setInterval(saveUI, 1500);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveUI(); });
+  window.addEventListener("pagehide", saveUI);
+
   /* ---------- جلب البيانات (مع تجاهل أي رد قديم لو في تعديل اتعمل أثناء الطلب) ---------- */
   function guarded(fn) {
     var seq = S.wseq;
@@ -733,6 +796,7 @@
     if ($("modalBg").classList.contains("show") && S.pickBon !== null) renderPicker();
     if (S.page === "management" && !S.selected) { if (S.mgmtTab === "pilots") renderMgmtList(); else if (S.mgmtTab === "customers") renderCustList(); }
     else if (S.page === "trackPilots") renderTpBody();
+    applyRestore();
   }
   function refresh(force) {
     if (!force && (S.queue.length || S.flushing)) return Promise.resolve();
@@ -753,7 +817,8 @@
     if (S.started) return; S.started = true;
     $("drawerFooterVersion").textContent = "إدارة صيدلية عوف v" + (CFG.APP_VERSION || "1.0.0");
     document.querySelectorAll(".drawer-item").forEach(function (el) { el.classList.toggle("on", el.dataset.page === S.page); });
-    renderNet(); renderPage(); checkStatus();
+    loadUI(); document.querySelectorAll(".drawer-item").forEach(function (el) { el.classList.toggle("on", el.dataset.page === S.page); });
+    renderNet(); renderPage(); checkStatus(); fetchPilots(); fetchCustomers(); fetchActive();
     setInterval(function () { if (document.hidden || S.polling) return; S.polling = true; refresh().then(function () { S.polling = false; }, function () { S.polling = false; }); }, CFG.POLL_MS || 10000);
     setInterval(function () { if (!document.hidden) checkStatus(); }, 30000);
   }
