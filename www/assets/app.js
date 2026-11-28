@@ -461,11 +461,11 @@
     var dm = function (m) { return m >= 0 ? esc(fmtDur(m)) : "—"; };
     var goods = Math.max(0, invTotal(o) - (Number(o.fee) || 0));
     h += '<div class="abody"><div class="dgrid">' +
-      cell("blue c3", "تاريخ الطلب", esc(o.dateTxt || "—")) + cell("blue c3", "وقت الطلب", esc(o.timeTxt || "—")) +
-      cell("yel c2", "وقت القبول", esc(o.accTxt || "—")) + cell("yel c2", "مدة التسليم", dm(o.delivDurMin)) + cell("yel c2", "وقت التوصيل", esc(o.doneTimeTxt || "—")) +
-      cell("pur c2", "وصول الصيدلية", esc(o.pharmTxt || "—")) + cell("pur c2", "انتهاء التجهيز", esc(o.prepEndTxt || "—")) + cell("pur c2", "بدء التوصيل", esc(o.delivTxt || "—")) +
-      cell("cyn c3", "مدة التجهيز", dm(o.prepDurMin)) + cell("cyn c3", "إجمالي المدة", dm(o.totMin)) +
-      cell("red c3", "سعر الطلب", num(goods) + " ج") + cell("grn c3", "خدمة التوصيل", num(o.fee) + " ج") + "</div>" +
+      cell("blue s6", "تاريخ الطلب", esc(o.dateTxt || "—")) + cell("blue s6", "وقت الطلب", esc(o.timeTxt || "—")) +
+      cell("gold s3", "وقت القبول", esc(o.accTxt || "—")) + cell("gold s3", "وقت الوصول للصيدلية", esc(o.pharmTxt || "—")) + cell("gold s3", "انتهاء التجهيز", esc(o.prepEndTxt || "—")) + cell("gold s3", "مدة التجهيز", dm(o.prepDurMin)) +
+      cell("orng s4", "بدء التوصيل", esc(o.delivTxt || "—")) + cell("orng s4", "وقت التسليم", esc(o.doneTimeTxt || "—")) + cell("orng s4", "مدة التوصيل", dm(o.delivDurMin)) +
+      cell("grn s12", "إجمالي مدة إنهاء الطلب", dm(o.totMin)) +
+      cell("red s6", "سعر الطلب", num(goods) + " ج") + cell("grn s6", "خدمة التوصيل", num(o.fee) + " ج") + "</div>" +
       custBlock(o) + invBlock(o) + pilotsSection(o, "الطيار المسلّم :") + "</div></div>";
     return h;
   }
