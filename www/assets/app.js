@@ -458,11 +458,14 @@
     var h = '<div class="ac' + (open ? " open" : "") + '" id="o' + o.bon + '">' + (open ? '<div class="ahead">' + inner + "</div>" : '<button class="ahead" data-act="ocOpen" data-bon="' + o.bon + '">' + inner + "</button>") + '<div class="glowln"></div>';
     if (!open) return h + '<div class="tcard"><div><small>يوم التسليم</small><b>' + esc(o.doneDay || "—") + (o.doneDateTxt ? " <span>(" + esc(o.doneDateTxt) + ")</span>" : "") + '</b></div><div><small>الساعة</small><b>' + esc(o.doneTimeTxt || "—") + '</b></div><div><small>الإجمالي</small><b dir="ltr">' + num(invTotal(o)) + " ج.م</b></div></div></div>";
     var cell = function (cls, l, v) { return '<div class="dc ' + cls + '"><small>' + l + "</small><b>" + v + "</b></div>"; };
+    var dm = function (m) { return m >= 0 ? esc(fmtDur(m)) : "—"; };
     var goods = Math.max(0, invTotal(o) - (Number(o.fee) || 0));
     h += '<div class="abody"><div class="dgrid">' +
       cell("blue c3", "تاريخ الطلب", esc(o.dateTxt || "—")) + cell("blue c3", "وقت الطلب", esc(o.timeTxt || "—")) +
-      cell("yel c2", "وقت القبول", esc(o.accTxt || "—")) + cell("yel c2", "مدة التسليم", esc(o.delivDurMin >= 0 ? fmtDur(o.delivDurMin) : "—")) + cell("yel c2", "وقت التوصيل", esc(o.doneTimeTxt || "—")) +
-      cell("neu c3", "سعر الطلب", num(goods) + " ج") + cell("grn c3", "خدمة التوصيل", num(o.fee) + " ج") + "</div>" +
+      cell("yel c2", "وقت القبول", esc(o.accTxt || "—")) + cell("yel c2", "مدة التسليم", dm(o.delivDurMin)) + cell("yel c2", "وقت التوصيل", esc(o.doneTimeTxt || "—")) +
+      cell("pur c2", "وصول الصيدلية", esc(o.pharmTxt || "—")) + cell("pur c2", "انتهاء التجهيز", esc(o.prepEndTxt || "—")) + cell("pur c2", "بدء التوصيل", esc(o.delivTxt || "—")) +
+      cell("cyn c3", "مدة التجهيز", dm(o.prepDurMin)) + cell("cyn c3", "إجمالي المدة", dm(o.totMin)) +
+      cell("red c3", "سعر الطلب", num(goods) + " ج") + cell("grn c3", "خدمة التوصيل", num(o.fee) + " ج") + "</div>" +
       custBlock(o) + invBlock(o) + pilotsSection(o, "الطيار المسلّم :") + "</div></div>";
     return h;
   }
