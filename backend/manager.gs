@@ -350,7 +350,7 @@ function orderObj_(rv, dv) {
     items: String(dv[O.DETAILS - 1] || ""), note: s(O.NOTE), km: Number(rv[O_KM - 1]) || 0, goods: goods, fee: fee, total: Math.round((goods + fee) * 100) / 100,
     pilotName: s(O.PNAME), pilotPhone: normPhone_(dv[O.PPHONE - 1]),
     prev1: s(O.P1N) === "--" ? "" : s(O.P1N), prev1Phone: normPhone_(dv[O.P1P - 1]), prev2: s(O.P2N) === "--" ? "" : s(O.P2N), prev2Phone: normPhone_(dv[O.P2P - 1]),
-    shopEta: s(O.SHOP_ETA), custEta: s(O.CUST_ETA), arrived: !!rv[O_ARR - 1], sloc: String(dv[O.SLOC - 1] || "").trim(), accMs: toMs_(rv[O.ACC_AT - 1]) || stepsOf_(rv).a, delivMs: toMs_(rv[O.DELIV_AT - 1]) || stepsOf_(rv).d, doneMs: toMs_(rv[O.DONE_AT - 1]) };
+    shopEta: s(O.SHOP_ETA), custEta: s(O.CUST_ETA), arrived: !!rv[O_ARR - 1], sloc: String(dv[O.SLOC - 1] || "").trim(), accMs: toMs_(rv[O.ACC_AT - 1]) || stepsOf_(rv).a, delivMs: toMs_(rv[O.DELIV_AT - 1]) || stepsOf_(rv).d, doneMs: toMs_(rv[O.DONE_AT - 1]), pharmMs: toMs_(rv[O_PHARM - 1]), prepEndMs: toMs_(rv[O.PREP_END - 1]), totMinSheet: Number(rv[O.TOTAL_MIN - 1]) || 0 };
 }
 // أوقات المراحل: عمود STEPS بيتكتب فيه "a:وقت-القبول|d:وقت-بدء-التوصيل" بالمللي ثانية (من تعديل بسيط في سكربت الطلبات، شوف orders-patch.txt)
 function stepsOf_(rv) {
@@ -374,6 +374,9 @@ function getOrders_(phase) {
         o.durMin = o.orderMs ? Math.max(0, Math.round((doneMs - o.orderMs) / 60000)) : -1;
       } else { o.doneDay = ""; o.doneDateTxt = String(ad[a][A_AT - 1] || ""); o.doneTimeTxt = ""; o.durMin = -1; }
       o.accTxt = timeTxtMs_(o.accMs); o.delivDurMin = (doneMs && o.delivMs && doneMs >= o.delivMs) ? Math.round((doneMs - o.delivMs) / 60000) : -1;
+      o.pharmTxt = timeTxtMs_(o.pharmMs); o.prepEndTxt = timeTxtMs_(o.prepEndMs); o.delivTxt = timeTxtMs_(o.delivMs);
+      o.prepDurMin = (o.pharmMs && o.prepEndMs && o.prepEndMs >= o.pharmMs) ? Math.round((o.prepEndMs - o.pharmMs) / 60000) : -1;      // مدة التجهيز: من وصول المندوب للصيدلية لحد ما يخلّص التجهيز
+      o.totMin = o.totMinSheet || ((doneMs && o.pharmMs && doneMs >= o.pharmMs) ? Math.round((doneMs - o.pharmMs) / 60000) : -1);      // إجمالي المدة: من وصوله للصيدلية لحد التسليم (زي عمود الشيت)
       list.push(o);
     }
     return { status: "success", list: list };
