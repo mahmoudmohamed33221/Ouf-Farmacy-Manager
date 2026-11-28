@@ -445,3 +445,12 @@ div.ahead{cursor:default;}
 .dgrid .pur{color:#C4B5FD;border-color:rgba(167,139,250,.6);background:rgba(167,139,250,.10);}
 .dgrid .cyn{color:#67E8F9;border-color:rgba(34,211,238,.55);background:rgba(34,211,238,.09);}
 .dgrid .red{color:#FCA5A5;border-color:rgba(239,68,68,.75);background:rgba(239,68,68,.12);}
+
+/* ===== v1.0.4: شبكة تم التوصيل (12 عمود) + نزول قيم الوقت في الكروت المقفولة ===== */
+.tcard>div>b{margin-top:4px;transform:none;}
+.dgrid{grid-template-columns:repeat(12,1fr);}
+.dgrid .s3{grid-column:span 3;}.dgrid .s4{grid-column:span 4;}.dgrid .s6{grid-column:span 6;}.dgrid .s12{grid-column:span 12;}
+.dgrid .dc small{font-size:10px;line-height:1.35;}
+.dgrid .gold{color:#FFC83D;border-color:rgba(255,200,61,.65);background:rgba(255,200,61,.10);}
+.dgrid .orng{color:#FF8A1F;border-color:rgba(255,122,0,.75);background:rgba(255,122,0,.12);}
+.dgrid .grn{color:#39FF14;border-color:rgba(57,255,20,.7);background:rgba(57,255,20,.08);text-shadow:none;box-shadow:none;}
