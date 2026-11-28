@@ -429,3 +429,19 @@ div.ahead{cursor:default;}
 .lc-ok.shop{background:#3B82F6;}
 .modal-box{position:relative;}
 
+/* ===== v1.0.3 ===== */
+/* القيم (اليوم/الساعة) على نفس سطر حروف ي س د */
+.tcard>div>b{margin-top:-1px;transform:none;}
+/* فاصل وقت الوصول: خط أحمر صغير أخف من فاصل الهيدر */
+.tcard>.tc-eta{position:relative;border-top:0;padding-top:10px;}
+.tcard>.tc-eta::before{content:"";position:absolute;top:0;left:14%;right:14%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,rgba(239,68,68,.5) 20%,rgba(254,202,202,.7) 50%,rgba(239,68,68,.5) 80%,transparent);box-shadow:0 0 5px rgba(239,68,68,.3);}
+/* حدود كل الكروت بلون البرنامج الأحمر */
+.ac,.ac.open{border:1.5px solid rgba(239,68,68,.8);box-shadow:0 4px 16px rgba(0,0,0,.35),0 0 10px rgba(239,68,68,.14);}
+.dp-card,.status-block,.placeholder-soon,.pbox{border:1px solid rgba(239,68,68,.6);}
+.pbox.prev{border:1px dashed rgba(239,68,68,.6);}
+.tcard{border-color:rgba(239,68,68,.4);}
+.tcard>div{border-inline-start-color:rgba(239,68,68,.25);}
+.modal-box{border-top:1.5px solid rgba(239,68,68,.7);}
+.dgrid .pur{color:#C4B5FD;border-color:rgba(167,139,250,.6);background:rgba(167,139,250,.10);}
+.dgrid .cyn{color:#67E8F9;border-color:rgba(34,211,238,.55);background:rgba(34,211,238,.09);}
+.dgrid .red{color:#FCA5A5;border-color:rgba(239,68,68,.75);background:rgba(239,68,68,.12);}
