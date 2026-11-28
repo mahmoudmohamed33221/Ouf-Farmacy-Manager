@@ -454,3 +454,13 @@ div.ahead{cursor:default;}
 .dgrid .gold{color:#FFC83D;border-color:rgba(255,200,61,.65);background:rgba(255,200,61,.10);}
 .dgrid .orng{color:#FF8A1F;border-color:rgba(255,122,0,.75);background:rgba(255,122,0,.12);}
 .dgrid .grn{color:#39FF14;border-color:rgba(57,255,20,.7);background:rgba(57,255,20,.08);text-shadow:none;box-shadow:none;}
+
+/* ===== v1.0.5: منع النسخ/التحديد + إزالة تأثيرات الضغط ===== */
+html,body,*{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}
+input,textarea{-webkit-user-select:text;user-select:text;}
+img{-webkit-user-drag:none;user-drag:none;}
+button,.sub-chip,.dp-row,.act-btn,.arw,.ib,.lc-b,.seg-btn,.pk-row{touch-action:manipulation;outline:none;}
+.sub-chip,.msub .act-btn,.dp-row{transition:none;}
+.sub-chip:active,.msub .act-btn:active{transform:none;}
+#lockScr{position:fixed;inset:0;z-index:99999;background:#0B0F19;color:#EF4444;display:grid;place-items:center;text-align:center;font-size:22px;font-weight:800;line-height:2;}
+@media print{body{display:none!important;}}
